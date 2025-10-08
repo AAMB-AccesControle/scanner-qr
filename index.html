@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Scanner QR - Contrôle Accès</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 15px;
+        }
+
+        .header {
+            background: white;
+            border-radius: 20px 20px 0 0;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            color: #1f2937;
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            color: #6b7280;
+            font-size: 14px;
+        }
+
+        .config-box {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 15px;
+            margin: 0;
+            color: #92400e;
+        }
+
+        .config-box.success {
+            background: #d1fae5;
+            border-color: #10b981;
+            color: #065f46;
+        }
+
+        .config-box input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 14px;
+            margin: 10px 0;
+        }
+
+        .config-box button {
+            width: 100%;
+            padding: 12px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 8px;
+        }
+
+        .scanner-box {
+            background: white;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        #reader {
+            border: 4px solid #667eea;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #000;
+            margin-bottom: 15px;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .btn {
+            padding: 16px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: transform 0.2s;
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        .btn-start {
+            background: #10b981;
+            color: white;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-stop {
+            background: #ef4444;
+            color: white;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+        }
+
+        .manual-section {
+            background: white;
+            padding: 20px;
+            border-radius: 0 0 20px 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .manual-section h3 {
+            color: #4b5563;
+            font-size: 16px;
+            margin-bottom: 12px;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .input-group input {
+            flex: 1;
+            padding: 14px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            font-size: 15px;
+        }
+
+        .input-group button {
+            padding: 14px 24px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 40px 20px;
+            border-radius: 20px;
+            text-align: center;
+            animation: zoomIn 0.4s ease;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+
+        @keyframes zoomIn {
+            from { opacity: 0; transform: scale(0.8); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .result.success {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+        }
+
+        .result.error {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+        }
+
+        .result-icon {
+            font-size: 80px;
+            margin-bottom: 15px;
+        }
+
+        .result-name {
+            font-size: 36px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .result-message {
+            font-size: 20px;
+            margin-bottom: 15px;
+        }
+
+        .result-atelier {
+            font-size: 32px;
+            font-weight: bold;
+            padding: 20px;
+            background: rgba(255,255,255,0.25);
+            border-radius: 12px;
+            display: inline-block;
+        }
+
+        .result-time {
+            margin-top: 15px;
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .stats {
+            background: rgba(255,255,255,0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 15px;
+            margin-top: 20px;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 20px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 12px;
+            color: white;
+        }
+
+        .stat-value {
+            font-size: 36px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            font-size: 13px;
+        }
+
+        .status {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-block;
+            margin: 10px 0;
+        }
+
+        .status.active {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .status.inactive {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        @media (max-width: 480px) {
+            .result-name { font-size: 28px; }
+            .result-atelier { font-size: 24px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎫 Contrôle d'Accès</h1>
+            <p>Scanner automatique par QR Code</p>
+        </div>
+
+        <div class="config-box" id="configBox">
+            <strong>⚙️ Configuration API requise</strong>
+            <input type="text" id="apiUrl" placeholder="URL de votre API Google Apps Script">
+            <button onclick="saveConfig()">💾 Enregistrer</button>
+            <button onclick="testAPI()" style="background:#10b981">🧪 Tester la connexion</button>
+        </div>
+
+        <div class="scanner-box">
+            <div class="controls">
+                <button class="btn btn-start" onclick="startScanner()">
+                    <span>📷</span>
+                    <span>Démarrer</span>
+                </button>
+                <button class="btn btn-stop" onclick="stopScanner()">
+                    <span>⏸️</span>
+                    <span>Arrêter</span>
+                </button>
+            </div>
+            <div id="scannerStatus" class="status inactive">⚫ Scanner arrêté</div>
+            <div id="reader"></div>
+        </div>
+
+        <div class="manual-section">
+            <h3>✍️ Saisie manuelle (secours)</h3>
+            <div class="input-group">
+                <input type="text" id="manualCode" placeholder="Code manuel">
+                <button onclick="checkManual()">✓</button>
+            </div>
+        </div>
+
+        <div id="result"></div>
+
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-value" id="statOK">0</div>
+                <div class="stat-label">✅ Autorisés</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="statKO">0</div>
+                <div class="stat-label">❌ Refusés</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let scanner = null;
+        let apiUrl = localStorage.getItem('apiUrl') || '';
+        let stats = JSON.parse(localStorage.getItem('stats') || '{"ok":0,"ko":0}');
+        let scanning = false;
+        let scannerActive = false;
+
+        window.onload = () => {
+            updateStats();
+            if (apiUrl) {
+                document.getElementById('apiUrl').value = apiUrl;
+                document.getElementById('configBox').className = 'config-box success';
+                document.getElementById('configBox').innerHTML = '<strong>✅ API configurée</strong><br>Cliquez sur "Démarrer" pour scanner';
+            }
+        };
+
+        function saveConfig() {
+            const url = document.getElementById('apiUrl').value.trim();
+            if (!url) {
+                alert('❌ Entrez une URL');
+                return;
+            }
+            if (!url.includes('script.google.com')) {
+                alert('⚠️ URL invalide');
+                return;
+            }
+            apiUrl = url;
+            localStorage.setItem('apiUrl', url);
+            document.getElementById('configBox').className = 'config-box success';
+            document.getElementById('configBox').innerHTML = '<strong>✅ API configurée</strong><br>Cliquez sur "Démarrer" pour scanner';
+        }
+
+        async function testAPI() {
+            if (!apiUrl) {
+                alert('❌ Configurez d\'abord l\'API');
+                return;
+            }
+            try {
+                const res = await fetch(`${apiUrl}?code=TEST&t=${Date.now()}`);
+                const data = await res.json();
+                alert(data.success !== undefined ? '✅ API accessible !' : '⚠️ Format incorrect');
+            } catch (e) {
+                alert('❌ Erreur connexion');
+            }
+        }
+
+        async function startScanner() {
+            if (!apiUrl) {
+                alert('❌ Configurez l\'API d\'abord');
+                return;
+            }
+
+            if (scannerActive) {
+                console.log('Scanner déjà actif');
+                return;
+            }
+
+            try {
+                scanner = new Html5Qrcode("reader");
+                await scanner.start(
+                    { facingMode: "environment" },
+                    { fps: 10, qrbox: { width: 250, height: 250 } },
+                    onScanSuccess,
+                    () => {} // Ignorer les erreurs de scan
+                );
+                scannerActive = true;
+                document.getElementById('scannerStatus').className = 'status active';
+                document.getElementById('scannerStatus').textContent = '🟢 Scanner actif - Présentez un QR code';
+            } catch (err) {
+                console.error(err);
+                alert('❌ Erreur caméra. Vérifiez les permissions ou utilisez la saisie manuelle.');
+            }
+        }
+
+        function stopScanner() {
+            if (scanner && scannerActive) {
+                scanner.stop().then(() => {
+                    scannerActive = false;
+                    document.getElementById('scannerStatus').className = 'status inactive';
+                    document.getElementById('scannerStatus').textContent = '⚫ Scanner arrêté';
+                });
+            }
+        }
+
+        function onScanSuccess(code) {
+            if (scanning) return;
+            scanning = true;
+            scanner.pause(true);
+            verifyCode(code);
+        }
+
+        function checkManual() {
+            const code = document.getElementById('manualCode').value.trim();
+            if (!code) {
+                alert('❌ Entrez un code');
+                return;
+            }
+            if (scannerActive) scanner.pause(true);
+            scanning = true;
+            verifyCode(code);
+            document.getElementById('manualCode').value = '';
+        }
+
+        async function verifyCode(code) {
+            if (!apiUrl) {
+                showResult(false, 'Erreur', 'API non configurée', '', '', '');
+                resumeScanner();
+                return;
+            }
+
+            try {
+                const res = await fetch(`${apiUrl}?code=${encodeURIComponent(code)}&t=${Date.now()}`);
+                const data = await res.json();
+
+                if (data.success) {
+                    if (data.autorise) {
+                        stats.ok++;
+                        beep(true);
+                    } else {
+                        stats.ko++;
+                        beep(false);
+                    }
+                    localStorage.setItem('stats', JSON.stringify(stats));
+                    updateStats();
+                    showResult(data.autorise, data.nom, data.message, data.atelier, data.heure || '', data.date || '');
+                } else {
+                    showResult(false, 'Erreur', data.error || 'Erreur inconnue', '', '', '');
+                }
+            } catch (e) {
+                console.error(e);
+                showResult(false, 'Erreur', 'Connexion impossible', '', '', '');
+            }
+
+            setTimeout(resumeScanner, 3000);
+        }
+
+        function resumeScanner() {
+            scanning = false;
+            if (scanner && scannerActive) {
+                scanner.resume();
+            }
+        }
+
+        function showResult(ok, nom, msg, atelier, heure, date) {
+            const cls = ok ? 'success' : 'error';
+            const icon = ok ? '✅' : '❌';
+            const time = (heure && date) ? `<div class="result-time">Scanné le ${date} à ${heure}</div>` : '';
+            
+            document.getElementById('result').innerHTML = `
+                <div class="result ${cls}">
+                    <div class="result-icon">${icon}</div>
+                    <div class="result-name">${esc(nom)}</div>
+                    <div class="result-message">${esc(msg)}</div>
+                    <div class="result-atelier">${esc(atelier)}</div>
+                    ${time}
+                </div>
+            `;
+        }
+
+        function updateStats() {
+            document.getElementById('statOK').textContent = stats.ok;
+            document.getElementById('statKO').textContent = stats.ko;
+        }
+
+        function esc(txt) {
+            const div = document.createElement('div');
+            div.textContent = txt;
+            return div.innerHTML;
+        }
+
+        function beep(ok) {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.frequency.value = ok ? 800 : 200;
+                gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.2);
+            } catch (e) {}
+        }
+    </script>
+</body>
+</html>
