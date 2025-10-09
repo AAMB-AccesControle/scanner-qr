@@ -442,7 +442,7 @@
                     }
                     localStorage.setItem('stats', JSON.stringify(stats));
                     updateStats();
-                    showResult(data.autorise, data.nom, data.message, data.atelier, data.heure || '', data.date || '');
+                    showResult(data.autorise, data.nom, data.message, data.image, data.atelier, data.heure || '', data.date || '');
                 } else {
                     showResult(false, 'Erreur', data.error || 'Erreur inconnue', '', '', '');
                 }
