@@ -93,7 +93,7 @@
 
         .config-buttons {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1fr 1fr 1fr;
             gap: 4px;
         }
 
@@ -109,6 +109,18 @@
         }
 
         .btn-cache {
+            background: #10b981;
+        }
+
+        .btn-mode {
+            background: #3b82f6;
+        }
+
+        .btn-mode.atelier {
+            background: #f59e0b;
+        }
+
+        .btn-mode.conference {
             background: #10b981;
         }
 
@@ -170,13 +182,72 @@
             color: #991b1b;
         }
 
+        .mode-indicator {
+            display: inline-block;
+            padding: 4px 12px;
+            background: #f3f4f6;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+
+        .mode-indicator.atelier {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .mode-indicator.conference {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
         #reader {
             border: 3px solid #667eea;
             border-radius: 8px;
             overflow: hidden;
             background: #000;
-            flex: 1;
-            min-height: 200px;
+            flex: 0 0 280px;
+            min-height: 280px;
+        }
+
+        .stats-local {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 6px;
+            margin-top: 8px;
+            font-size: 10px;
+        }
+
+        .stats-local-title {
+            font-weight: 600;
+            color: #4b5563;
+            margin-bottom: 4px;
+        }
+
+        .stats-local-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px;
+        }
+
+        .stat-local-item {
+            background: white;
+            padding: 4px;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .stat-local-value {
+            font-size: 14px;
+            font-weight: bold;
+            color: #1f2937;
+        }
+
+        .stat-local-label {
+            font-size: 9px;
+            color: #6b7280;
         }
 
         .bottom-section {
@@ -184,6 +255,8 @@
             border-radius: 0 0 12px 12px;
             padding: 8px;
             box-shadow: 0 -2px 4px rgba(0,0,0,0.1);
+            overflow-y: auto;
+            max-height: 140px;
         }
 
         .manual-section {
@@ -199,6 +272,7 @@
         .input-group {
             display: flex;
             gap: 6px;
+            margin-bottom: 6px;
         }
 
         .input-group input {
@@ -218,6 +292,51 @@
             font-weight: 600;
             cursor: pointer;
             font-size: 13px;
+        }
+
+        .global-stats {
+            background: #f3f4f6;
+            border-radius: 6px;
+            padding: 6px;
+            font-size: 9px;
+        }
+
+        .global-stats-title {
+            font-weight: 600;
+            color: #4b5563;
+            margin-bottom: 4px;
+        }
+
+        .global-stats-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px;
+        }
+
+        .global-stat-item {
+            text-align: center;
+            padding: 4px;
+            background: white;
+            border-radius: 4px;
+        }
+
+        .global-stat-value {
+            font-size: 12px;
+            font-weight: bold;
+            color: #1f2937;
+        }
+
+        .reset-btn {
+            width: 100%;
+            padding: 6px;
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 11px;
+            margin-top: 6px;
         }
 
         .result {
@@ -288,33 +407,10 @@
             opacity: 0.9;
         }
 
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 6px;
-        }
-
-        .stat-item {
-            text-align: center;
-            padding: 6px;
-            background: #f3f4f6;
-            border-radius: 6px;
-        }
-
-        .stat-value {
-            font-size: 20px;
-            font-weight: bold;
-            color: #1f2937;
-        }
-
-        .stat-label {
-            font-size: 10px;
-            color: #6b7280;
-        }
-
         @media (max-width: 480px) {
             .result-name { font-size: 24px; }
             .result-atelier { font-size: 20px; }
+            #reader { flex: 0 0 250px; }
         }
     </style>
 </head>
@@ -322,7 +418,7 @@
     <div class="container">
         <div class="header">
             <h1>🎫 Contrôle d'Accès Ateliers</h1>
-            <p>Scanner automatique v1.0</p>
+            <p>Scanner automatique v2.0</p>
             <div class="cache-status" id="cacheStatus">⏳ Chargement du cache...</div>
         </div>
 
@@ -332,6 +428,7 @@
             <div class="config-buttons">
                 <button onclick="saveConfig()">💾 Enregistrer</button>
                 <button class="btn-cache" onclick="loadCache()">📥 Charger cache</button>
+                <button class="btn-mode" id="modeBtn" onclick="toggleMode()">📍 Mode</button>
             </div>
         </div>
 
@@ -344,8 +441,25 @@
                     ⏸️ Arrêter
                 </button>
             </div>
-            <div id="scannerStatus" class="inactive">⚫ Arrêté</div>
+            <div>
+                <div id="scannerStatus" class="inactive">⚫ Arrêté</div>
+                <span class="mode-indicator" id="modeIndicator">📍 Atelier</span>
+            </div>
             <div id="reader"></div>
+
+            <div class="stats-local">
+                <div class="stats-local-title">📱 Scans locaux (téléphone)</div>
+                <div class="stats-local-row">
+                    <div class="stat-local-item">
+                        <div class="stat-local-value" id="localOK">0</div>
+                        <div class="stat-local-label">✅ Autorisé</div>
+                    </div>
+                    <div class="stat-local-item">
+                        <div class="stat-local-value" id="localKO">0</div>
+                        <div class="stat-local-label">❌ Refusé</div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="bottom-section">
@@ -357,16 +471,20 @@
                 </div>
             </div>
 
-            <div class="stats">
-                <div class="stat-item">
-                    <div class="stat-value" id="statOK">0</div>
-                    <div class="stat-label">✅ OK</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value" id="statKO">0</div>
-                    <div class="stat-label">❌ KO</div>
+            <div class="global-stats">
+                <div class="global-stats-title">📊 Statistiques globales (GoogleSheet)</div>
+                <div class="global-stats-row">
+                    <div class="global-stat-item">
+                        <div class="global-stat-value" id="globalOK">-</div>
+                        <div class="stat-local-label">✅ Autorisé</div>
+                    </div>
+                    <div class="global-stat-item">
+                        <div class="global-stat-value" id="globalKO">-</div>
+                        <div class="stat-local-label">❌ Refusé</div>
+                    </div>
                 </div>
             </div>
+            <button class="reset-btn" onclick="resetLocalStats()">🔄 Réinitialiser compteur</button>
         </div>
     </div>
 
@@ -374,22 +492,52 @@
 
     <script>
         let scanner = null;
-        let apiUrl = localStorage.getItem('apiUrl') || '';
-        let stats = JSON.parse(localStorage.getItem('stats') || '{"ok":0,"ko":0}');
+        let apiUrl = '';
+        let localStats = { ok: 0, ko: 0 };
         let scanning = false;
         let scannerActive = false;
         let localCache = [];
         let usingCache = false;
+        let currentMode = 'atelier'; // 'atelier' ou 'conference'
+        let globalStats = { ok: 0, ko: 0 };
 
         window.onload = () => {
-            updateStats();
+            apiUrl = localStorage.getItem('apiUrl') || '';
+            localStats = JSON.parse(localStorage.getItem('localStats') || '{"ok":0,"ko":0}');
+            currentMode = localStorage.getItem('scanMode') || 'atelier';
+            
+            updateLocalStats();
+            updateModeDisplay();
+            
             if (apiUrl) {
                 document.getElementById('apiUrl').value = apiUrl;
                 document.getElementById('configBox').className = 'config-box success';
             }
-            // Charger le cache au démarrage
             loadCache();
         };
+
+        function toggleMode() {
+            currentMode = currentMode === 'atelier' ? 'conference' : 'atelier';
+            localStorage.setItem('scanMode', currentMode);
+            updateModeDisplay();
+        }
+
+        function updateModeDisplay() {
+            const indicator = document.getElementById('modeIndicator');
+            const btn = document.getElementById('modeBtn');
+            
+            if (currentMode === 'atelier') {
+                indicator.textContent = '📍 Atelier';
+                indicator.className = 'mode-indicator atelier';
+                btn.className = 'config-box button btn-mode atelier';
+                btn.textContent = '🏭 Atelier';
+            } else {
+                indicator.textContent = '🎤 Conférence';
+                indicator.className = 'mode-indicator conference';
+                btn.className = 'config-box button btn-mode conference';
+                btn.textContent = '🎤 Conférence';
+            }
+        }
 
         function saveConfig() {
             const url = document.getElementById('apiUrl').value.trim();
@@ -418,7 +566,6 @@
             }
 
             try {
-                // Créer une fonction pour récupérer tous les participants
                 const response = await fetch(`${apiUrl}?action=getAll&t=${Date.now()}`);
                 const data = await response.json();
 
@@ -429,9 +576,9 @@
 
                     statusEl.className = 'cache-status ready';
                     statusEl.textContent = `✅ Cache chargé (${localCache.length} personnes)`;
-                    console.log(`Cache chargé : ${localCache.length} participants`);
+                    
+                    loadGlobalStats();
                 } else {
-                    // Si pas de réponse, charger le cache existant
                     const savedCache = localStorage.getItem('localCache');
                     if (savedCache) {
                         localCache = JSON.parse(savedCache);
@@ -445,7 +592,6 @@
                 }
             } catch (e) {
                 console.error('Erreur cache:', e);
-                // Charger le cache existant
                 const savedCache = localStorage.getItem('localCache');
                 if (savedCache) {
                     localCache = JSON.parse(savedCache);
@@ -457,6 +603,25 @@
                     statusEl.textContent = '❌ Erreur connexion';
                 }
             }
+        }
+
+        function loadGlobalStats() {
+            let authorized = 0;
+            let unauthorized = 0;
+            
+            for (let participant of localCache) {
+                if (participant.dateScan) {
+                    if (participant.atelier && participant.atelier !== 'Conférence') {
+                        unauthorized++;
+                    } else {
+                        authorized++;
+                    }
+                }
+            }
+            
+            globalStats.ok = authorized;
+            globalStats.ko = unauthorized;
+            updateGlobalStats();
         }
 
         async function startScanner() {
@@ -482,7 +647,7 @@
                 );
                 scannerActive = true;
                 document.getElementById('scannerStatus').className = 'active';
-                document.getElementById('scannerStatus').textContent = '🟢 Actif - ' + (usingCache ? 'Mode cache' : 'Mode en ligne');
+                document.getElementById('scannerStatus').textContent = '🟢 Actif - Mode cache';
             } catch (err) {
                 console.error(err);
                 alert('❌ Erreur caméra');
@@ -519,7 +684,6 @@
         }
 
         function verifyCodeLocal(code) {
-            // Recherche INSTANTANÉE dans le cache local
             const now = new Date();
             const heure = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0') + ':' + String(now.getSeconds()).padStart(2, '0');
             const date = String(now.getDate()).padStart(2, '0') + '/' + String(now.getMonth() + 1).padStart(2, '0') + '/' + now.getFullYear();
@@ -527,30 +691,46 @@
             const participant = localCache.find(p => p.code.toLowerCase() === code.toLowerCase());
 
             if (participant) {
-                if (participant.atelier === 'Atelier A') {
-                    beepAtelierA();
-                    stats.ok++;
-                    showResultCustom('success', participant.nom, 'AUTORISE', participant.atelier, heure, date);
-                } else if (participant.atelier === 'Atelier B') {
-                    beepAtelierB();
-                    stats.ok++;
-                    showResultCustom('success', participant.nom, 'AUTORISE', participant.atelier, heure, date);
+                // Vérifier l'autorisation selon le mode
+                let isAuthorized = false;
+                let displayAtelier = participant.atelier;
+                
+                if (currentMode === 'atelier') {
+                    // Mode atelier : autorisé si atelier A ou B
+                    isAuthorized = participant.atelier === 'Atelier A' || participant.atelier === 'Atelier B';
+                    if (!isAuthorized && participant.atelier === 'Conférence') {
+                        beepRefuse();
+                        stats.ko++;
+                        showResultCustom('warning', participant.nom, 'REFUSÉ', participant.atelier, heure, date);
+                    } else if (isAuthorized) {
+                        beepAtelierSuccess();
+                        localStats.ok++;
+                        showResultCustom('success', participant.nom, 'AUTORISÉ', participant.atelier, heure, date);
+                    }
                 } else {
-                    beepRefuse();
-                    stats.ok++;
-                    showResultCustom('warning', participant.nom, 'REFUSÉ', participant.atelier, heure, date);
+                    // Mode conférence : autorisé si conférence
+                    isAuthorized = participant.atelier === 'Conférence';
+                    if (!isAuthorized) {
+                        beepAtelierRefuse();
+                        localStats.ko++;
+                        showResultCustom('warning', participant.nom, 'REFUSÉ', participant.atelier, heure, date);
+                    } else {
+                        beepConferenceSuccess();
+                        localStats.ok++;
+                        showResultCustom('success', participant.nom, 'AUTORISÉ', participant.atelier, heure, date);
+                    }
                 }
 
-                // Synchroniser en arrière-plan (sans bloquer l'affichage)
-                syncToServer(code, participant.nom, heure, date);
+                // Synchroniser en arrière-plan
+                syncToServer(code, participant.nom, heure, date, currentMode);
             } else {
                 beepNonAutorise();
-                stats.ko++;
-                showResultCustom('error', code, 'NON AUTORISÉ', '', '', '');
+                localStats.ko++;
+                showResultCustom('error', code, 'NON AUTORISÉ', '', heure, date);
             }
 
-            localStorage.setItem('stats', JSON.stringify(stats));
-            updateStats();
+            localStorage.setItem('localStats', JSON.stringify(localStats));
+            updateLocalStats();
 
             setTimeout(resumeScanner, 3000);
         }
@@ -562,10 +742,9 @@
             }
         }
 
-        async function syncToServer(code, nom, heure, date) {
-            // Synchroniser les données avec le serveur en arrière-plan
+        async function syncToServer(code, nom, heure, date, mode) {
             try {
-                await fetch(`${apiUrl}?code=${encodeURIComponent(code)}&heure=${encodeURIComponent(heure)}&date=${encodeURIComponent(date)}&sync=1&t=${Date.now()}`);
+                await fetch(`${apiUrl}?code=${encodeURIComponent(code)}&heure=${encodeURIComponent(heure)}&date=${encodeURIComponent(date)}&lieu=${encodeURIComponent(mode)}&sync=1&t=${Date.now()}`);
             } catch (e) {
                 console.log('Sync en arrière-plan échouée (normal si mode offline)');
             }
@@ -599,9 +778,22 @@
             }, 3000);
         }
 
-        function updateStats() {
-            document.getElementById('statOK').textContent = stats.ok;
-            document.getElementById('statKO').textContent = stats.ko;
+        function updateLocalStats() {
+            document.getElementById('localOK').textContent = localStats.ok;
+            document.getElementById('localKO').textContent = localStats.ko;
+        }
+
+        function updateGlobalStats() {
+            document.getElementById('globalOK').textContent = globalStats.ok;
+            document.getElementById('globalKO').textContent = globalStats.ko;
+        }
+
+        function resetLocalStats() {
+            if (confirm('⚠️ Êtes-vous sûr de vouloir réinitialiser le compteur local ?')) {
+                localStats = { ok: 0, ko: 0 };
+                localStorage.setItem('localStats', JSON.stringify(localStats));
+                updateLocalStats();
+            }
         }
 
         function esc(txt) {
@@ -612,68 +804,82 @@
 
         // SONS PERSONNALISÉS
 
-        function beepAtelierA() {
+        function beepAtelierSuccess() {
             try {
                 const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                // Deux bips graves pour Atelier
+                const freq = 300;
+                
+                for (let i = 0; i < 2; i++) {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.frequency.value = freq;
+                    const startTime = ctx.currentTime + (i * 0.25);
+                    gain.gain.setValueAtTime(0.3, startTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.15);
+                    osc.start(startTime);
+                    osc.stop(startTime + 0.15);
+                }
+            } catch (e) {}
+        }
+
+        function beepConferenceSuccess() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                // Un bip aigu court pour Conférence
                 const osc = ctx.createOscillator();
                 const gain = ctx.createGain();
                 osc.connect(gain);
                 gain.connect(ctx.destination);
                 osc.frequency.value = 1000;
                 gain.gain.setValueAtTime(0.3, ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
                 osc.start();
-                osc.stop(ctx.currentTime + 0.15);
-            } catch (e) {}
-        }
-
-        function beepAtelierB() {
-            try {
-                const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                const osc1 = ctx.createOscillator();
-                const gain1 = ctx.createGain();
-                osc1.connect(gain1);
-                gain1.connect(ctx.destination);
-                osc1.frequency.value = 1000;
-                gain1.gain.setValueAtTime(0.3, ctx.currentTime);
-                gain1.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
-                osc1.start(ctx.currentTime);
-                osc1.stop(ctx.currentTime + 0.15);
-                
-                const osc2 = ctx.createOscillator();
-                const gain2 = ctx.createGain();
-                osc2.connect(gain2);
-                gain2.connect(ctx.destination);
-                osc2.frequency.value = 1000;
-                gain2.gain.setValueAtTime(0.3, ctx.currentTime + 0.2);
-                gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
-                osc2.start(ctx.currentTime + 0.2);
-                osc2.stop(ctx.currentTime + 0.35);
+                osc.stop(ctx.currentTime + 0.1);
             } catch (e) {}
         }
 
         function beepRefuse() {
             try {
                 const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                const osc1 = ctx.createOscillator();
-                const gain1 = ctx.createGain();
-                osc1.connect(gain1);
-                gain1.connect(ctx.destination);
-                osc1.frequency.value = 300;
-                gain1.gain.setValueAtTime(0.3, ctx.currentTime);
-                gain1.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
-                osc1.start(ctx.currentTime);
-                osc1.stop(ctx.currentTime + 0.15);
+                // Deux bips graves pour refus
+                const freq = 300;
                 
-                const osc2 = ctx.createOscillator();
-                const gain2 = ctx.createGain();
-                osc2.connect(gain2);
-                gain2.connect(ctx.destination);
-                osc2.frequency.value = 300;
-                gain2.gain.setValueAtTime(0.3, ctx.currentTime + 0.2);
-                gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
-                osc2.start(ctx.currentTime + 0.2);
-                osc2.stop(ctx.currentTime + 0.35);
+                for (let i = 0; i < 2; i++) {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.frequency.value = freq;
+                    const startTime = ctx.currentTime + (i * 0.25);
+                    gain.gain.setValueAtTime(0.3, startTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.15);
+                    osc.start(startTime);
+                    osc.stop(startTime + 0.15);
+                }
+            } catch (e) {}
+        }
+
+        function beepAtelierRefuse() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                // Deux bips graves pour refus atelier
+                const freq = 300;
+                
+                for (let i = 0; i < 2; i++) {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.frequency.value = freq;
+                    const startTime = ctx.currentTime + (i * 0.25);
+                    gain.gain.setValueAtTime(0.3, startTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.15);
+                    osc.start(startTime);
+                    osc.stop(startTime + 0.15);
+                }
             } catch (e) {}
         }
 
