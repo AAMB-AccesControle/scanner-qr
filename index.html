@@ -296,7 +296,7 @@
     <div class="container">
         <div class="header">
             <h1>🎫 Contrôle d'Accès</h1>
-            <p>Scanner automatique v0.3</p>
+            <p>Scanner automatique v0.4</p>
         </div>
 
         <div class="config-box" id="configBox">
@@ -529,7 +529,7 @@
                 const gain = ctx.createGain();
                 osc.connect(gain);
                 gain.connect(ctx.destination);
-                osc.frequency.value = 1000; // Fréquence haute (aigu)
+                osc.frequency.value = 2000; // Fréquence haute (aigu)
                 gain.gain.setValueAtTime(0.3, ctx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
                 osc.start();
@@ -547,7 +547,7 @@
                 const gain1 = ctx.createGain();
                 osc1.connect(gain1);
                 gain1.connect(ctx.destination);
-                osc1.frequency.value = 1000;
+                osc1.frequency.value = 2000;
                 gain1.gain.setValueAtTime(0.3, ctx.currentTime);
                 gain1.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
                 osc1.start(ctx.currentTime);
@@ -558,7 +558,7 @@
                 const gain2 = ctx.createGain();
                 osc2.connect(gain2);
                 gain2.connect(ctx.destination);
-                osc2.frequency.value = 1000;
+                osc2.frequency.value = 2000;
                 gain2.gain.setValueAtTime(0.3, ctx.currentTime + 0.2);
                 gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
                 osc2.start(ctx.currentTime + 0.2);
@@ -576,7 +576,7 @@
                 const gain1 = ctx.createGain();
                 osc1.connect(gain1);
                 gain1.connect(ctx.destination);
-                osc1.frequency.value = 300; // Fréquence basse (grave)
+                osc1.frequency.value = 700; // Fréquence basse (grave)
                 gain1.gain.setValueAtTime(0.3, ctx.currentTime);
                 gain1.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
                 osc1.start(ctx.currentTime);
@@ -587,7 +587,7 @@
                 const gain2 = ctx.createGain();
                 osc2.connect(gain2);
                 gain2.connect(ctx.destination);
-                osc2.frequency.value = 300;
+                osc2.frequency.value = 700;
                 gain2.gain.setValueAtTime(0.3, ctx.currentTime + 0.2);
                 gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
                 osc2.start(ctx.currentTime + 0.2);
@@ -605,7 +605,7 @@
                     const gain = ctx.createGain();
                     osc.connect(gain);
                     gain.connect(ctx.destination);
-                    osc.frequency.value = 250; // Fréquence très grave
+                    osc.frequency.value = 500; // Fréquence très grave
                     const startTime = ctx.currentTime + (i * 0.15);
                     gain.gain.setValueAtTime(0.3, startTime);
                     gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.12);
