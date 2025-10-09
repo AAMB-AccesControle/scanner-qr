@@ -33,7 +33,7 @@
         .header {
             background: white;
             border-radius: 12px 12px 0 0;
-            padding: 10px;
+            padding: 8px;
             text-align: center;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
@@ -47,6 +47,24 @@
         .header p {
             color: #6b7280;
             font-size: 11px;
+        }
+
+        .cache-status {
+            font-size: 9px;
+            color: #6b7280;
+            margin-top: 2px;
+        }
+
+        .cache-status.loading {
+            color: #f59e0b;
+        }
+
+        .cache-status.ready {
+            color: #10b981;
+        }
+
+        .cache-status.error {
+            color: #ef4444;
         }
 
         .config-box {
@@ -73,8 +91,13 @@
             margin: 4px 0;
         }
 
+        .config-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px;
+        }
+
         .config-box button {
-            width: 100%;
             padding: 6px;
             background: #667eea;
             color: white;
@@ -82,8 +105,11 @@
             border-radius: 4px;
             font-weight: 600;
             cursor: pointer;
-            margin-bottom: 4px;
             font-size: 11px;
+        }
+
+        .btn-cache {
+            background: #10b981;
         }
 
         .scanner-box {
@@ -295,14 +321,18 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🎫 Contrôle d'Accès</h1>
-            <p>Scanner automatique v0.4</p>
+            <h1>🎫 Contrôle d'Accès Ateliers</h1>
+            <p>Scanner automatique v1.0</p>
+            <div class="cache-status" id="cacheStatus">⏳ Chargement du cache...</div>
         </div>
 
         <div class="config-box" id="configBox">
             <strong>⚙️ Configuration API</strong>
             <input type="text" id="apiUrl" placeholder="URL API Google Apps Script">
-            <button onclick="saveConfig()">💾 Enregistrer</button>
+            <div class="config-buttons">
+                <button onclick="saveConfig()">💾 Enregistrer</button>
+                <button class="btn-cache" onclick="loadCache()">📥 Charger cache</button>
+            </div>
         </div>
 
         <div class="scanner-box">
@@ -348,14 +378,17 @@
         let stats = JSON.parse(localStorage.getItem('stats') || '{"ok":0,"ko":0}');
         let scanning = false;
         let scannerActive = false;
+        let localCache = [];
+        let usingCache = false;
 
         window.onload = () => {
             updateStats();
             if (apiUrl) {
                 document.getElementById('apiUrl').value = apiUrl;
                 document.getElementById('configBox').className = 'config-box success';
-                document.getElementById('configBox').innerHTML = '<strong>✅ Prêt</strong>';
             }
+            // Charger le cache au démarrage
+            loadCache();
         };
 
         function saveConfig() {
@@ -371,12 +404,69 @@
             apiUrl = url;
             localStorage.setItem('apiUrl', url);
             document.getElementById('configBox').className = 'config-box success';
-            document.getElementById('configBox').innerHTML = '<strong>✅ Prêt</strong>';
+        }
+
+        async function loadCache() {
+            const statusEl = document.getElementById('cacheStatus');
+            statusEl.className = 'cache-status loading';
+            statusEl.textContent = '⏳ Chargement des données...';
+
+            if (!apiUrl) {
+                statusEl.className = 'cache-status error';
+                statusEl.textContent = '❌ API non configurée';
+                return;
+            }
+
+            try {
+                // Créer une fonction pour récupérer tous les participants
+                const response = await fetch(`${apiUrl}?action=getAll&t=${Date.now()}`);
+                const data = await response.json();
+
+                if (data.success && data.participants) {
+                    localCache = data.participants;
+                    localStorage.setItem('localCache', JSON.stringify(localCache));
+                    usingCache = true;
+
+                    statusEl.className = 'cache-status ready';
+                    statusEl.textContent = `✅ Cache chargé (${localCache.length} personnes)`;
+                    console.log(`Cache chargé : ${localCache.length} participants`);
+                } else {
+                    // Si pas de réponse, charger le cache existant
+                    const savedCache = localStorage.getItem('localCache');
+                    if (savedCache) {
+                        localCache = JSON.parse(savedCache);
+                        usingCache = true;
+                        statusEl.className = 'cache-status ready';
+                        statusEl.textContent = `✅ Cache local (${localCache.length} personnes)`;
+                    } else {
+                        statusEl.className = 'cache-status error';
+                        statusEl.textContent = '❌ Impossible de charger le cache';
+                    }
+                }
+            } catch (e) {
+                console.error('Erreur cache:', e);
+                // Charger le cache existant
+                const savedCache = localStorage.getItem('localCache');
+                if (savedCache) {
+                    localCache = JSON.parse(savedCache);
+                    usingCache = true;
+                    statusEl.className = 'cache-status ready';
+                    statusEl.textContent = `✅ Cache local (${localCache.length} personnes)`;
+                } else {
+                    statusEl.className = 'cache-status error';
+                    statusEl.textContent = '❌ Erreur connexion';
+                }
+            }
         }
 
         async function startScanner() {
             if (!apiUrl) {
                 alert('❌ Configurez l\'API');
+                return;
+            }
+
+            if (!usingCache) {
+                alert('⚠️ Chargez le cache d\'abord (bouton "Charger cache")');
                 return;
             }
 
@@ -392,7 +482,7 @@
                 );
                 scannerActive = true;
                 document.getElementById('scannerStatus').className = 'active';
-                document.getElementById('scannerStatus').textContent = '🟢 Actif';
+                document.getElementById('scannerStatus').textContent = '🟢 Actif - ' + (usingCache ? 'Mode cache' : 'Mode en ligne');
             } catch (err) {
                 console.error(err);
                 alert('❌ Erreur caméra');
@@ -413,7 +503,7 @@
             if (scanning) return;
             scanning = true;
             scanner.pause(true);
-            verifyCode(code);
+            verifyCodeLocal(code);
         }
 
         function checkManual() {
@@ -424,51 +514,43 @@
             }
             if (scannerActive) scanner.pause(true);
             scanning = true;
-            verifyCode(code);
+            verifyCodeLocal(code);
             document.getElementById('manualCode').value = '';
         }
 
-        async function verifyCode(code) {
-            if (!apiUrl) {
-                showResultCustom('error', 'Erreur', 'API non configurée', '', '', '');
-                resumeScanner();
-                return;
-            }
+        function verifyCodeLocal(code) {
+            // Recherche INSTANTANÉE dans le cache local
+            const now = new Date();
+            const heure = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0') + ':' + String(now.getSeconds()).padStart(2, '0');
+            const date = String(now.getDate()).padStart(2, '0') + '/' + String(now.getMonth() + 1).padStart(2, '0') + '/' + now.getFullYear();
 
-            try {
-                const res = await fetch(`${apiUrl}?code=${encodeURIComponent(code)}&t=${Date.now()}`);
-                const data = await res.json();
+            const participant = localCache.find(p => p.code.toLowerCase() === code.toLowerCase());
 
-                if (data.success) {
-                    if (data.autorise) {
-                        stats.ok++;
-                        
-                        // Déterminer le type de son et d'affichage selon l'atelier
-                        if (data.atelier === 'Atelier A') {
-                            beepAtelierA(); // 1 bip aigu court
-                            showResultCustom('success', data.nom, 'AUTORISE', data.atelier, data.heure || '', data.date || '');
-                        } else if (data.atelier === 'Atelier B') {
-                            beepAtelierB(); // 2 bips aigus rapprochés
-                            showResultCustom('success', data.nom, 'AUTORISE', data.atelier, data.heure || '', data.date || '');
-                        } else {
-                            beepRefuse(); // 2 bips graves rapprochés
-                            showResultCustom('warning', data.nom, 'REFUSÉ', data.atelier, data.heure || '', data.date || '');
-                        }
-                    } else {
-                        stats.ko++;
-                        beepNonAutorise(); // 5 bips graves rapprochés
-                        showResultCustom('error', code, 'NON AUTORISÉ', data.atelier, '', '');
-                    }
-                    
-                    localStorage.setItem('stats', JSON.stringify(stats));
-                    updateStats();
+            if (participant) {
+                if (participant.atelier === 'Atelier A') {
+                    beepAtelierA();
+                    stats.ok++;
+                    showResultCustom('success', participant.nom, 'AUTORISE', participant.atelier, heure, date);
+                } else if (participant.atelier === 'Atelier B') {
+                    beepAtelierB();
+                    stats.ok++;
+                    showResultCustom('success', participant.nom, 'AUTORISE', participant.atelier, heure, date);
                 } else {
-                    showResultCustom('error', 'Erreur', data.error || 'Erreur inconnue', '', '', '');
+                    beepRefuse();
+                    stats.ok++;
+                    showResultCustom('warning', participant.nom, 'REFUSÉ', participant.atelier, heure, date);
                 }
-            } catch (e) {
-                console.error(e);
-                showResultCustom('error', 'Erreur', 'Connexion impossible', '', '', '');
+
+                // Synchroniser en arrière-plan (sans bloquer l'affichage)
+                syncToServer(code, participant.nom, heure, date);
+            } else {
+                beepNonAutorise();
+                stats.ko++;
+                showResultCustom('error', code, 'NON AUTORISÉ', '', '', '');
             }
+
+            localStorage.setItem('stats', JSON.stringify(stats));
+            updateStats();
 
             setTimeout(resumeScanner, 3000);
         }
@@ -477,6 +559,15 @@
             scanning = false;
             if (scanner && scannerActive) {
                 scanner.resume();
+            }
+        }
+
+        async function syncToServer(code, nom, heure, date) {
+            // Synchroniser les données avec le serveur en arrière-plan
+            try {
+                await fetch(`${apiUrl}?code=${encodeURIComponent(code)}&heure=${encodeURIComponent(heure)}&date=${encodeURIComponent(date)}&sync=1&t=${Date.now()}`);
+            } catch (e) {
+                console.log('Sync en arrière-plan échouée (normal si mode offline)');
             }
         }
 
@@ -522,14 +613,13 @@
         // SONS PERSONNALISÉS
 
         function beepAtelierA() {
-            // 1 bip aigu court
             try {
                 const ctx = new (window.AudioContext || window.webkitAudioContext)();
                 const osc = ctx.createOscillator();
                 const gain = ctx.createGain();
                 osc.connect(gain);
                 gain.connect(ctx.destination);
-                osc.frequency.value = 2000; // Fréquence haute (aigu)
+                osc.frequency.value = 1000;
                 gain.gain.setValueAtTime(0.3, ctx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
                 osc.start();
@@ -538,27 +628,23 @@
         }
 
         function beepAtelierB() {
-            // 2 bips aigus rapprochés
             try {
                 const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                
-                // Premier bip
                 const osc1 = ctx.createOscillator();
                 const gain1 = ctx.createGain();
                 osc1.connect(gain1);
                 gain1.connect(ctx.destination);
-                osc1.frequency.value = 2000;
+                osc1.frequency.value = 1000;
                 gain1.gain.setValueAtTime(0.3, ctx.currentTime);
                 gain1.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
                 osc1.start(ctx.currentTime);
                 osc1.stop(ctx.currentTime + 0.15);
                 
-                // Deuxième bip
                 const osc2 = ctx.createOscillator();
                 const gain2 = ctx.createGain();
                 osc2.connect(gain2);
                 gain2.connect(ctx.destination);
-                osc2.frequency.value = 2000;
+                osc2.frequency.value = 1000;
                 gain2.gain.setValueAtTime(0.3, ctx.currentTime + 0.2);
                 gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
                 osc2.start(ctx.currentTime + 0.2);
@@ -567,27 +653,23 @@
         }
 
         function beepRefuse() {
-            // 2 bips graves rapprochés
             try {
                 const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                
-                // Premier bip grave
                 const osc1 = ctx.createOscillator();
                 const gain1 = ctx.createGain();
                 osc1.connect(gain1);
                 gain1.connect(ctx.destination);
-                osc1.frequency.value = 700; // Fréquence basse (grave)
+                osc1.frequency.value = 300;
                 gain1.gain.setValueAtTime(0.3, ctx.currentTime);
                 gain1.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
                 osc1.start(ctx.currentTime);
                 osc1.stop(ctx.currentTime + 0.15);
                 
-                // Deuxième bip grave
                 const osc2 = ctx.createOscillator();
                 const gain2 = ctx.createGain();
                 osc2.connect(gain2);
                 gain2.connect(ctx.destination);
-                osc2.frequency.value = 700;
+                osc2.frequency.value = 300;
                 gain2.gain.setValueAtTime(0.3, ctx.currentTime + 0.2);
                 gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
                 osc2.start(ctx.currentTime + 0.2);
@@ -596,16 +678,14 @@
         }
 
         function beepNonAutorise() {
-            // 5 bips graves rapprochés
             try {
                 const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                
                 for (let i = 0; i < 5; i++) {
                     const osc = ctx.createOscillator();
                     const gain = ctx.createGain();
                     osc.connect(gain);
                     gain.connect(ctx.destination);
-                    osc.frequency.value = 500; // Fréquence très grave
+                    osc.frequency.value = 250;
                     const startTime = ctx.currentTime + (i * 0.15);
                     gain.gain.setValueAtTime(0.3, startTime);
                     gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.12);
