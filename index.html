@@ -498,7 +498,7 @@
         let scannerActive = false;
         let localCache = [];
         let usingCache = false;
-        let currentMode = 'atelier'; // 'atelier' ou 'conference'
+        let currentMode = 'atelier';
         let globalStats = { ok: 0, ko: 0 };
 
         window.onload = () => {
@@ -576,7 +576,6 @@
 
                     statusEl.className = 'cache-status ready';
                     statusEl.textContent = `✅ Cache chargé (${localCache.length} personnes)`;
-                    
                     loadGlobalStats();
                 } else {
                     const savedCache = localStorage.getItem('localCache');
@@ -611,10 +610,10 @@
             
             for (let participant of localCache) {
                 if (participant.dateScan) {
-                    if (participant.atelier && participant.atelier !== 'Conférence') {
-                        unauthorized++;
-                    } else {
+                    if (participant.atelier === 'Conférence') {
                         authorized++;
+                    } else {
+                        unauthorized++;
                     }
                 }
             }
@@ -691,37 +690,43 @@
             const participant = localCache.find(p => p.code.toLowerCase() === code.toLowerCase());
 
             if (participant) {
-                // Vérifier l'autorisation selon le mode
                 let isAuthorized = false;
-                let displayAtelier = participant.atelier;
+                let resultType = 'success';
+                let resultMessage = 'AUTORISÉ';
                 
                 if (currentMode === 'atelier') {
-                    // Mode atelier : autorisé si atelier A ou B
+                    // Mode atelier : autorisé si Atelier A ou B
                     isAuthorized = participant.atelier === 'Atelier A' || participant.atelier === 'Atelier B';
-                    if (!isAuthorized && participant.atelier === 'Conférence') {
-                        beepRefuse();
-                        stats.ko++;
-                        showResultCustom('warning', participant.nom, 'REFUSÉ', participant.atelier, heure, date);
-                    } else if (isAuthorized) {
+                    
+                    if (isAuthorized) {
                         beepAtelierSuccess();
                         localStats.ok++;
-                        showResultCustom('success', participant.nom, 'AUTORISÉ', participant.atelier, heure, date);
-                    }
-                } else {
-                    // Mode conférence : autorisé si conférence
-                    isAuthorized = participant.atelier === 'Conférence';
-                    if (!isAuthorized) {
+                        resultType = 'success';
+                        resultMessage = 'AUTORISÉ';
+                    } else {
                         beepAtelierRefuse();
                         localStats.ko++;
-                        showResultCustom('warning', participant.nom, 'REFUSÉ', participant.atelier, heure, date);
-                    } else {
+                        resultType = 'warning';
+                        resultMessage = 'REFUSÉ';
+                    }
+                } else {
+                    // Mode conférence : autorisé si Conférence
+                    isAuthorized = participant.atelier === 'Conférence';
+                    
+                    if (isAuthorized) {
                         beepConferenceSuccess();
                         localStats.ok++;
-                        showResultCustom('success', participant.nom, 'AUTORISÉ', participant.atelier, heure, date);
+                        resultType = 'success';
+                        resultMessage = 'AUTORISÉ';
+                    } else {
+                        beepAtelierRefuse();
+                        localStats.ko++;
+                        resultType = 'warning';
+                        resultMessage = 'REFUSÉ';
                     }
                 }
-
-                // Synchroniser en arrière-plan
+                
+                showResultCustom(resultType, participant.nom, resultMessage, participant.atelier, heure, date);
                 syncToServer(code, participant.nom, heure, date, currentMode);
             } else {
                 beepNonAutorise();
@@ -841,31 +846,10 @@
             } catch (e) {}
         }
 
-        function beepRefuse() {
-            try {
-                const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                // Deux bips graves pour refus
-                const freq = 300;
-                
-                for (let i = 0; i < 2; i++) {
-                    const osc = ctx.createOscillator();
-                    const gain = ctx.createGain();
-                    osc.connect(gain);
-                    gain.connect(ctx.destination);
-                    osc.frequency.value = freq;
-                    const startTime = ctx.currentTime + (i * 0.25);
-                    gain.gain.setValueAtTime(0.3, startTime);
-                    gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.15);
-                    osc.start(startTime);
-                    osc.stop(startTime + 0.15);
-                }
-            } catch (e) {}
-        }
-
         function beepAtelierRefuse() {
             try {
                 const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                // Deux bips graves pour refus atelier
+                // Deux bips graves pour refus
                 const freq = 300;
                 
                 for (let i = 0; i < 2; i++) {
