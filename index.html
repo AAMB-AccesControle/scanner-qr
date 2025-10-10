@@ -207,7 +207,11 @@
             border-radius: 8px;
             overflow: hidden;
             background: #000;
-            flex: 0 0 400px;
+            flex: 1;
+            min-height: 200px;
+            aspect-ratio: 1 / 1;       /* 🔸 Garde le cadre carré */
+            max-width: 100%;           /* 🔸 S'adapte à la largeur de l'écran */
+            margin: 0 auto;            /* 🔸 Centre le cadre horizontalement */
         }
 
         .bottom-section {
@@ -353,7 +357,7 @@
     <div class="container">
         <div class="header">
             <h1>🎫 Contrôle d'Accès</h1>
-            <p>Scanner automatique v1.32</p>
+            <p>Scanner automatique v1.33</p>
             <div class="cache-status" id="cacheStatus">⏳ Chargement du cache...</div>
         </div>
 
