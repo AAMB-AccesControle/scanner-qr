@@ -103,7 +103,7 @@
 
         .config-buttons {
             display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-columns: 1fr 1fr;
             gap: 4px;
         }
 
@@ -350,7 +350,7 @@
     <div class="container">
         <div class="header">
             <h1>🎫 Contrôle d'Accès</h1>
-            <p>Scanner automatique v2.5</p>
+            <p>Scanner automatique v2.7</p>
             <div class="cache-status" id="cacheStatus">⏳ Chargement...</div>
         </div>
 
@@ -374,6 +374,9 @@
             <div class="controls">
                 <button class="btn btn-start" id="cameraBtnToggle" onclick="toggleCamera()">
                     📷 Actif
+                </button>
+                <button class="btn" id="flashBtn" style="background: #667eea; color: white;" onclick="toggleFlash()">
+                    🔦 Flash OFF
                 </button>
                 <button class="btn" id="modeBtn" style="background: #f59e0b; color: white;" onclick="toggleMode()">
                     🏭 Atelier
