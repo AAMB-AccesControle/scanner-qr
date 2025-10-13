@@ -91,6 +91,16 @@
             margin: 4px 0;
         }
 
+        .config-box select {
+            width: 100%;
+            padding: 6px;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            font-size: 12px;
+            margin: 4px 0;
+            background: white;
+        }
+
         .config-buttons {
             display: grid;
             grid-template-columns: 1fr 1fr 1fr;
@@ -114,14 +124,6 @@
 
         .btn-mode {
             background: #3b82f6;
-        }
-
-        .btn-mode.atelier {
-            background: #f59e0b;
-        }
-
-        .btn-mode.conference {
-            background: #10b981;
         }
 
         .scanner-box {
@@ -182,7 +184,7 @@
             color: #991b1b;
         }
 
-        .mode-indicator {
+        .list-indicator {
             display: inline-block;
             padding: 4px 12px;
             background: #f3f4f6;
@@ -192,12 +194,7 @@
             margin-left: 8px;
         }
 
-        .mode-indicator.atelier {
-            background: #fef3c7;
-            color: #92400e;
-        }
-
-        .mode-indicator.conference {
+        .list-indicator.active {
             background: #d1fae5;
             color: #065f46;
         }
@@ -353,13 +350,19 @@
     <div class="container">
         <div class="header">
             <h1>🎫 Contrôle d'Accès</h1>
-            <p>Scanner automatique v1.3401</p>
-            <div class="cache-status" id="cacheStatus">⏳ Chargement du cache...</div>
+            <p>Scanner automatique v2.0</p>
+            <div class="cache-status" id="cacheStatus">⏳ Chargement...</div>
         </div>
 
         <div class="config-box" id="configBox">
-            <strong>⚙️ Configuration API</strong>
+            <strong>⚙️ Configuration</strong>
             <input type="text" id="apiUrl" placeholder="URL API Google Apps Script">
+            <div style="margin: 6px 0;">
+                <label style="font-size: 11px;">📋 Sélectionner la liste:</label>
+                <select id="listSelect" onchange="changeList()">
+                    <option value="">Chargement...</option>
+                </select>
+            </div>
             <div class="config-buttons">
                 <button onclick="saveConfig()">💾 Enregistrer</button>
                 <button class="btn-cache" onclick="loadCache()">📥 Charger cache</button>
@@ -378,7 +381,7 @@
             </div>
             <div>
                 <div id="scannerStatus" class="inactive">⚫ Arrêté</div>
-                <span class="mode-indicator" id="modeIndicator">📍 Atelier</span>
+                <span class="list-indicator" id="listIndicator">📋 -</span>
             </div>
             <div id="reader"></div>
         </div>
@@ -417,6 +420,8 @@
         let usingCache = false;
         let currentMode = 'atelier';
         let flashEnabled = false;
+        let currentListName = '';
+        let availableLists = [];
 
         window.onload = () => {
             updateStats();
@@ -425,9 +430,124 @@
                 document.getElementById('configBox').className = 'config-box success';
             }
             currentMode = localStorage.getItem('scanMode') || 'atelier';
+            currentListName = localStorage.getItem('currentList') || '';
             updateModeDisplay();
-            loadCache();
+            loadAvailableLists();
         };
+
+        async function loadAvailableLists() {
+            const statusEl = document.getElementById('cacheStatus');
+            
+            if (!apiUrl) {
+                statusEl.className = 'cache-status error';
+                statusEl.textContent = '❌ API non configurée';
+                return;
+            }
+
+            try {
+                const response = await fetch(`${apiUrl}?action=getActiveLists&t=${Date.now()}`);
+                const data = await response.json();
+
+                if (data.success && data.lists) {
+                    availableLists = data.lists;
+                    updateListSelect();
+                    
+                    const activeLists = availableLists.filter(l => l.estActive);
+                    if (activeLists.length > 0) {
+                        statusEl.className = 'cache-status ready';
+                        statusEl.textContent = `✅ ${activeLists.length} liste(s) active(s)`;
+                    } else {
+                        statusEl.className = 'cache-status error';
+                        statusEl.textContent = '⚠️ Aucune liste active maintenant';
+                    }
+                } else {
+                    statusEl.className = 'cache-status error';
+                    statusEl.textContent = '❌ Erreur chargement listes';
+                }
+            } catch (e) {
+                console.error('Erreur:', e);
+                statusEl.className = 'cache-status error';
+                statusEl.textContent = '❌ Erreur connexion';
+            }
+        }
+
+        function updateListSelect() {
+            const select = document.getElementById('listSelect');
+            select.innerHTML = '';
+
+            if (availableLists.length === 0) {
+                select.innerHTML = '<option value="">Aucune liste</option>';
+                return;
+            }
+
+            // Ajouter les listes actives d'abord
+            const activeLists = availableLists.filter(l => l.estActive);
+            if (activeLists.length > 0) {
+                const optgroup1 = document.createElement('optgroup');
+                optgroup1.label = '🟢 Listes actives';
+                activeLists.forEach(list => {
+                    const option = document.createElement('option');
+                    option.value = list.nom;
+                    option.textContent = `${list.nom} (${list.heureDebut}-${list.heureFin})`;
+                    optgroup1.appendChild(option);
+                });
+                select.appendChild(optgroup1);
+            }
+
+            // Ajouter les autres listes
+            const inactiveLists = availableLists.filter(l => !l.estActive);
+            if (inactiveLists.length > 0) {
+                const optgroup2 = document.createElement('optgroup');
+                optgroup2.label = '⚫ Autres listes';
+                inactiveLists.forEach(list => {
+                    const option = document.createElement('option');
+                    option.value = list.nom;
+                    option.textContent = `${list.nom} (${list.date} ${list.heureDebut}-${list.heureFin})`;
+                    optgroup2.appendChild(option);
+                });
+                select.appendChild(optgroup2);
+            }
+
+            // Sélectionner la liste actuelle
+            if (currentListName) {
+                select.value = currentListName;
+            } else if (activeLists.length > 0) {
+                select.value = activeLists[0].nom;
+                currentListName = activeLists[0].nom;
+                localStorage.setItem('currentList', currentListName);
+            }
+
+            updateListIndicator();
+        }
+
+        function changeList() {
+            const select = document.getElementById('listSelect');
+            currentListName = select.value.trim();
+
+            if (!currentListName) {
+                alert('Sélectionnez une liste');
+                return;
+            }
+
+            localStorage.setItem('currentList', currentListName);
+            updateListIndicator();
+            loadCache();
+        }
+
+        function updateListIndicator() {
+            const indicator = document.getElementById('listIndicator');
+            const selectedList = availableLists.find(l => l.nom === currentListName);
+
+            if (selectedList) {
+                const activeClass = selectedList.estActive ? 'active' : '';
+                const status = selectedList.estActive ? '🟢' : '⚫';
+                indicator.textContent = `${status} ${currentListName}`;
+                indicator.className = `list-indicator ${activeClass}`;
+            } else {
+                indicator.textContent = '📋 -';
+                indicator.className = 'list-indicator';
+            }
+        }
 
         function toggleMode() {
             currentMode = currentMode === 'atelier' ? 'conference' : 'atelier';
@@ -436,41 +556,40 @@
         }
 
         function updateModeDisplay() {
-            const indicator = document.getElementById('modeIndicator');
+            const indicator = document.getElementById('modeIndicator') || document.querySelector('.mode-indicator');
             const btn = document.getElementById('modeBtn');
             
             if (currentMode === 'atelier') {
-                indicator.textContent = '📍 Atelier';
-                indicator.className = 'mode-indicator atelier';
-                btn.className = 'config-box button btn-mode atelier';
+                if (indicator) indicator.textContent = '🏭 Atelier';
                 btn.textContent = '🏭 Atelier';
+                btn.style.background = '#f59e0b';
             } else {
-                indicator.textContent = '🎤 Conférence';
-                indicator.className = 'mode-indicator conference';
-                btn.className = 'config-box button btn-mode conference';
+                if (indicator) indicator.textContent = '🎤 Conférence';
                 btn.textContent = '🎤 Conférence';
+                btn.style.background = '#10b981';
             }
         }
 
         function saveConfig() {
             const url = document.getElementById('apiUrl').value.trim();
             if (!url) {
-                alert('❌ Entrez une URL');
+                alert('Entrez une URL');
                 return;
             }
             if (!url.includes('script.google.com')) {
-                alert('⚠️ URL invalide');
+                alert('URL invalide');
                 return;
             }
             apiUrl = url;
             localStorage.setItem('apiUrl', url);
             document.getElementById('configBox').className = 'config-box success';
+            loadAvailableLists();
         }
 
         async function loadCache() {
             const statusEl = document.getElementById('cacheStatus');
             statusEl.className = 'cache-status loading';
-            statusEl.textContent = '⏳ Chargement des données...';
+            statusEl.textContent = '⏳ Chargement cache...';
 
             if (!apiUrl) {
                 statusEl.className = 'cache-status error';
@@ -478,42 +597,33 @@
                 return;
             }
 
+            if (!currentListName) {
+                statusEl.className = 'cache-status error';
+                statusEl.textContent = '❌ Sélectionnez une liste';
+                return;
+            }
+
             try {
-                const response = await fetch(`${apiUrl}?action=getAll&t=${Date.now()}`);
+                const response = await fetch(`${apiUrl}?action=getAll&listeName=${encodeURIComponent(currentListName)}&t=${Date.now()}`);
                 const data = await response.json();
 
                 if (data.success && data.participants) {
                     localCache = data.participants;
                     localStorage.setItem('localCache', JSON.stringify(localCache));
+                    localStorage.setItem('currentListCache', currentListName);
                     usingCache = true;
 
                     statusEl.className = 'cache-status ready';
-                    statusEl.textContent = `✅ Cache chargé (${localCache.length} personnes)`;
-                    console.log(`Cache chargé : ${localCache.length} participants`);
+                    statusEl.textContent = `✅ Cache chargé (${localCache.length} personnes) - ${currentListName}`;
+                    console.log(`Cache chargé : ${localCache.length} participants pour ${currentListName}`);
                 } else {
-                    const savedCache = localStorage.getItem('localCache');
-                    if (savedCache) {
-                        localCache = JSON.parse(savedCache);
-                        usingCache = true;
-                        statusEl.className = 'cache-status ready';
-                        statusEl.textContent = `✅ Cache local (${localCache.length} personnes)`;
-                    } else {
-                        statusEl.className = 'cache-status error';
-                        statusEl.textContent = '❌ Impossible de charger le cache';
-                    }
+                    statusEl.className = 'cache-status error';
+                    statusEl.textContent = '❌ Impossible de charger le cache';
                 }
             } catch (e) {
                 console.error('Erreur cache:', e);
-                const savedCache = localStorage.getItem('localCache');
-                if (savedCache) {
-                    localCache = JSON.parse(savedCache);
-                    usingCache = true;
-                    statusEl.className = 'cache-status ready';
-                    statusEl.textContent = `✅ Cache local (${localCache.length} personnes)`;
-                } else {
-                    statusEl.className = 'cache-status error';
-                    statusEl.textContent = '❌ Erreur connexion';
-                }
+                statusEl.className = 'cache-status error';
+                statusEl.textContent = '❌ Erreur connexion';
             }
         }
 
@@ -527,12 +637,17 @@
 
         async function startScanner() {
             if (!apiUrl) {
-                alert('❌ Configurez l\'API');
+                alert('Configurez l\'API');
+                return;
+            }
+
+            if (!currentListName) {
+                alert('Sélectionnez une liste');
                 return;
             }
 
             if (!usingCache) {
-                alert('⚠️ Chargez le cache d\'abord (bouton "Charger cache")');
+                alert('Chargez le cache d\'abord');
                 return;
             }
 
@@ -551,10 +666,10 @@
                 btn.textContent = '⏹️ Arrêter';
                 btn.className = 'btn btn-stop';
                 document.getElementById('scannerStatus').className = 'active';
-                document.getElementById('scannerStatus').textContent = '🟢 Actif - ' + (usingCache ? 'Mode cache' : 'Mode en ligne');
+                document.getElementById('scannerStatus').textContent = '🟢 Actif';
             } catch (err) {
                 console.error(err);
-                alert('❌ Erreur caméra');
+                alert('Erreur caméra');
             }
         }
 
@@ -577,7 +692,7 @@
 
         function toggleFlash() {
             if (!scannerActive) {
-                alert('❌ Démarrez le scanner d\'abord');
+                alert('Démarrez le scanner d\'abord');
                 return;
             }
 
@@ -597,7 +712,7 @@
                     }
                 }).catch(err => {
                     console.log('Flash non supporté:', err);
-                    alert('⚠️ Flash non supporté sur cet appareil');
+                    alert('Flash non supporté sur cet appareil');
                     flashEnabled = false;
                     btn.textContent = '🔦 Flash OFF';
                     btn.style.background = '#667eea';
@@ -615,7 +730,7 @@
         function checkManual() {
             const code = document.getElementById('manualCode').value.trim();
             if (!code) {
-                alert('❌ Entrez un code');
+                alert('Entrez un code');
                 return;
             }
             if (scannerActive) scanner.pause(true);
@@ -634,33 +749,11 @@
             if (participant) {
                 let resultType = 'success';
                 let resultMessage = 'AUTORISÉ';
-                let beep = beepAtelierA;
 
-                if (currentMode === 'atelier') {
-                    if (participant.atelier === 'Atelier A' || participant.atelier === 'Atelier B') {
-                        beep = beepAtelierA;
-                        stats.ok++;
-                    } else {
-                        beep = beepRefuse;
-                        stats.ko++;
-                        resultType = 'warning';
-                        resultMessage = 'REFUSÉ';
-                    }
-                } else {
-                    if (participant.atelier === 'Conférence') {
-                        beep = beepConferenceSuccess;
-                        stats.ok++;
-                    } else {
-                        beep = beepAtelierB;
-                        stats.ko++;
-                        resultType = 'warning';
-                        resultMessage = 'REFUSÉ';
-                    }
-                }
-
-                beep();
+                stats.ok++;
+                beepAtelierA();
                 showResultCustom(resultType, participant.nom, resultMessage, participant.atelier, heure, date);
-                syncToServer(code, participant.nom, heure, date, currentMode);
+                syncToServer(code, participant.nom, heure, date, currentMode, currentListName);
             } else {
                 beepNonAutorise();
                 stats.ko++;
@@ -680,11 +773,11 @@
             }
         }
 
-        async function syncToServer(code, nom, heure, date, mode) {
+        async function syncToServer(code, nom, heure, date, mode, listeName) {
             try {
-                await fetch(`${apiUrl}?code=${encodeURIComponent(code)}&heure=${encodeURIComponent(heure)}&date=${encodeURIComponent(date)}&lieu=${encodeURIComponent(mode)}&sync=1&t=${Date.now()}`);
+                await fetch(`${apiUrl}?code=${encodeURIComponent(code)}&heure=${encodeURIComponent(heure)}&date=${encodeURIComponent(date)}&lieu=${encodeURIComponent(mode)}&listeName=${encodeURIComponent(listeName)}&sync=1&t=${Date.now()}`);
             } catch (e) {
-                console.log('Sync en arrière-plan échouée (normal si mode offline)');
+                console.log('Sync échouée');
             }
         }
 
@@ -741,71 +834,6 @@
                 gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
                 osc.start();
                 osc.stop(ctx.currentTime + 0.15);
-            } catch (e) {}
-        }
-
-        function beepAtelierB() {
-            try {
-                const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                const osc1 = ctx.createOscillator();
-                const gain1 = ctx.createGain();
-                osc1.connect(gain1);
-                gain1.connect(ctx.destination);
-                osc1.frequency.value = 1000;
-                gain1.gain.setValueAtTime(0.3, ctx.currentTime);
-                gain1.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
-                osc1.start(ctx.currentTime);
-                osc1.stop(ctx.currentTime + 0.15);
-                
-                const osc2 = ctx.createOscillator();
-                const gain2 = ctx.createGain();
-                osc2.connect(gain2);
-                gain2.connect(ctx.destination);
-                osc2.frequency.value = 1000;
-                gain2.gain.setValueAtTime(0.3, ctx.currentTime + 0.2);
-                gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
-                osc2.start(ctx.currentTime + 0.2);
-                osc2.stop(ctx.currentTime + 0.35);
-            } catch (e) {}
-        }
-
-        function beepRefuse() {
-            try {
-                const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                const osc1 = ctx.createOscillator();
-                const gain1 = ctx.createGain();
-                osc1.connect(gain1);
-                gain1.connect(ctx.destination);
-                osc1.frequency.value = 300;
-                gain1.gain.setValueAtTime(0.3, ctx.currentTime);
-                gain1.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
-                osc1.start(ctx.currentTime);
-                osc1.stop(ctx.currentTime + 0.15);
-                
-                const osc2 = ctx.createOscillator();
-                const gain2 = ctx.createGain();
-                osc2.connect(gain2);
-                gain2.connect(ctx.destination);
-                osc2.frequency.value = 300;
-                gain2.gain.setValueAtTime(0.3, ctx.currentTime + 0.2);
-                gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
-                osc2.start(ctx.currentTime + 0.2);
-                osc2.stop(ctx.currentTime + 0.35);
-            } catch (e) {}
-        }
-
-        function beepConferenceSuccess() {
-            try {
-                const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
-                osc.connect(gain);
-                gain.connect(ctx.destination);
-                osc.frequency.value = 1000;
-                gain.gain.setValueAtTime(0.3, ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
-                osc.start();
-                osc.stop(ctx.currentTime + 0.1);
             } catch (e) {}
         }
 
