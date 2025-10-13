@@ -375,8 +375,8 @@
                 <button class="btn btn-start" id="cameraBtnToggle" onclick="toggleCamera()">
                     📷 Actif
                 </button>
-                <button class="btn" id="flashBtn" style="background: #667eea; color: white;" onclick="toggleFlash()">
-                    🔦 Flash OFF
+                <button class="btn" style="background: #667eea; color: white;" onclick="loadAvailableLists()">
+                    🔄 Refresh
                 </button>
             </div>
             <div>
@@ -475,49 +475,33 @@
             const select = document.getElementById('listSelect');
             select.innerHTML = '';
 
-            if (availableLists.length === 0) {
-                select.innerHTML = '<option value="">Aucune liste</option>';
+            // Filtrer uniquement les listes actives (date + heure actuelles)
+            const activeLists = availableLists.filter(l => l.estActive);
+
+            if (activeLists.length === 0) {
+                select.innerHTML = '<option value="">Aucune liste active</option>';
                 return;
             }
 
-            // Ajouter les listes actives d'abord
-            const activeLists = availableLists.filter(l => l.estActive);
-            if (activeLists.length > 0) {
-                const optgroup1 = document.createElement('optgroup');
-                optgroup1.label = '🟢 Listes actives';
-                activeLists.forEach(list => {
-                    const option = document.createElement('option');
-                    option.value = list.nom;
-                    option.textContent = `${list.nom} (${list.heureDebut}-${list.heureFin})`;
-                    optgroup1.appendChild(option);
-                });
-                select.appendChild(optgroup1);
-            }
+            // Ajouter uniquement les listes actives avec juste le nom
+            activeLists.forEach(list => {
+                const option = document.createElement('option');
+                option.value = list.nom;
+                option.textContent = list.nom;
+                select.appendChild(option);
+            });
 
-            // Ajouter les autres listes
-            const inactiveLists = availableLists.filter(l => !l.estActive);
-            if (inactiveLists.length > 0) {
-                const optgroup2 = document.createElement('optgroup');
-                optgroup2.label = '⚫ Autres listes';
-                inactiveLists.forEach(list => {
-                    const option = document.createElement('option');
-                    option.value = list.nom;
-                    option.textContent = `${list.nom} (${list.date} ${list.heureDebut}-${list.heureFin})`;
-                    optgroup2.appendChild(option);
-                });
-                select.appendChild(optgroup2);
-            }
-
-            // Sélectionner la liste actuelle
-            if (currentListName) {
+            // Sélectionner la liste actuelle ou la première
+            if (currentListName && activeLists.find(l => l.nom === currentListName)) {
                 select.value = currentListName;
-            } else if (activeLists.length > 0) {
+            } else {
                 select.value = activeLists[0].nom;
                 currentListName = activeLists[0].nom;
                 localStorage.setItem('currentList', currentListName);
             }
 
             updateListIndicator();
+            updateModeButtonVisibility();
         }
 
         function changeList() {
