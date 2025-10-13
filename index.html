@@ -350,7 +350,7 @@
     <div class="container">
         <div class="header">
             <h1>🎫 Contrôle d'Accès</h1>
-            <p>Scanner automatique v2.1</p>
+            <p>Scanner automatique v2.5</p>
             <div class="cache-status" id="cacheStatus">⏳ Chargement...</div>
         </div>
 
@@ -375,8 +375,8 @@
                 <button class="btn btn-start" id="cameraBtnToggle" onclick="toggleCamera()">
                     📷 Actif
                 </button>
-                <button class="btn" style="background: #667eea; color: white;" onclick="loadAvailableLists()">
-                    🔄 Refresh
+                <button class="btn" id="modeBtn" style="background: #f59e0b; color: white;" onclick="toggleMode()">
+                    🏭 Atelier
                 </button>
             </div>
             <div>
@@ -448,21 +448,27 @@
                 const response = await fetch(`${apiUrl}?action=getActiveLists&t=${Date.now()}`);
                 const data = await response.json();
 
+                console.log('Réponse API:', data);
+
                 if (data.success && data.lists) {
                     availableLists = data.lists;
+                    console.log('Listes reçues:', availableLists);
                     updateListSelect();
                     
                     const activeLists = availableLists.filter(l => l.estActive);
+                    console.log('Listes actives:', activeLists);
+                    
                     if (activeLists.length > 0) {
                         statusEl.className = 'cache-status ready';
                         statusEl.textContent = `✅ ${activeLists.length} liste(s) active(s)`;
                     } else {
                         statusEl.className = 'cache-status error';
-                        statusEl.textContent = '⚠️ Aucune liste active maintenant';
+                        statusEl.textContent = '⚠️ Aucune liste active';
                     }
                 } else {
                     statusEl.className = 'cache-status error';
-                    statusEl.textContent = '❌ Erreur chargement listes';
+                    statusEl.textContent = '❌ Erreur: ' + (data.error || 'Réponse invalide');
+                    console.error('Erreur dans la réponse:', data);
                 }
             } catch (e) {
                 console.error('Erreur:', e);
@@ -515,6 +521,7 @@
 
             localStorage.setItem('currentList', currentListName);
             updateListIndicator();
+            updateModeButtonVisibility();
             loadCache();
         }
 
@@ -533,25 +540,44 @@
             }
         }
 
+        function updateModeDisplay() {
+            const btn = document.getElementById('modeBtn');
+            
+            if (currentMode === 'atelier') {
+                btn.textContent = '🏭 Atelier';
+                btn.style.background = '#f59e0b';
+            } else {
+                btn.textContent = '🎤 Conférence';
+                btn.style.background = '#10b981';
+            }
+        }
+
+        function updateModeButtonVisibility() {
+            const btn = document.getElementById('modeBtn');
+            const singleLocationLists = ['AG', 'TERROIR', 'GALA', 'MIDI - MER', 'MIDI - JEU'];
+            
+            if (singleLocationLists.includes(currentListName)) {
+                btn.style.display = 'none';
+            } else {
+                btn.style.display = 'block';
+            }
+        }
+
+        function getSingleLocationName(listName) {
+            const locationMap = {
+                'AG': 'Assemblée Générale',
+                'TERROIR': 'Terroir',
+                'GALA': 'Gala',
+                'MIDI - MER': 'MIDI - Mercredi',
+                'MIDI - JEU': 'MIDI - Jeudi'
+            };
+            return locationMap[listName] || null;
+        }
+
         function toggleMode() {
             currentMode = currentMode === 'atelier' ? 'conference' : 'atelier';
             localStorage.setItem('scanMode', currentMode);
             updateModeDisplay();
-        }
-
-        function updateModeDisplay() {
-            const indicator = document.getElementById('modeIndicator') || document.querySelector('.mode-indicator');
-            const btn = document.getElementById('modeBtn');
-            
-            if (currentMode === 'atelier') {
-                if (indicator) indicator.textContent = '🏭 Atelier';
-                btn.textContent = '🏭 Atelier';
-                btn.style.background = '#f59e0b';
-            } else {
-                if (indicator) indicator.textContent = '🎤 Conférence';
-                btn.textContent = '🎤 Conférence';
-                btn.style.background = '#10b981';
-            }
         }
 
         function saveConfig() {
@@ -731,14 +757,54 @@
             const participant = localCache.find(p => p.code.toLowerCase() === code.toLowerCase());
 
             if (participant) {
-                let resultType = 'success';
-                let resultMessage = 'AUTORISÉ';
-
-                stats.ok++;
-                beepAtelierA();
-                showResultCustom(resultType, participant.nom, resultMessage, participant.atelier, heure, date);
-                syncToServer(code, participant.nom, heure, date, currentMode, currentListName);
+                // Vérifier si c'est une liste avec un seul lieu (AG, GALA, TERROIR, MIDI - MER, MIDI - JEU)
+                const singleLocation = getSingleLocationName(currentListName);
+                
+                if (singleLocation) {
+                    // Pour les listes uniques - personne trouvée = AUTORISÉE
+                    stats.ok++;
+                    beepAtelierA();
+                    showResultCustom('success', participant.nom, 'AUTORISÉ', singleLocation, heure, date);
+                    syncToServer(code, participant.nom, heure, date, singleLocation, currentListName);
+                } else {
+                    // Pour les listes multi-lieux (CONFERENCE, ATELIER A, ATELIER B)
+                    const participantType = String(participant.atelier).trim().toUpperCase();
+                    
+                    // Mapper le mode actuel au type attendu
+                    let typeAttendu = [];
+                    if (currentMode === 'atelier') {
+                        typeAttendu = ['ATELIER A', 'ATELIER B'];
+                    } else if (currentMode === 'conference') {
+                        typeAttendu = ['CONFERENCE'];
+                    }
+                    
+                    // Vérifier si le participant correspond au mode sélectionné
+                    const estAutorise = typeAttendu.some(t => participantType === t.toUpperCase());
+                    
+                    // Vérifier si le participant est du mauvais type (mauvais mode)
+                    const estMauvaisMode = (currentMode === 'atelier' && participantType === 'CONFERENCE') ||
+                                          (currentMode === 'conference' && (participantType === 'ATELIER A' || participantType === 'ATELIER B'));
+                    
+                    if (estAutorise) {
+                        // BON MODE - AUTORISÉ ✅ Vert + 1 bip aigu
+                        stats.ok++;
+                        beepAtelierA();
+                        showResultCustom('success', participant.nom, 'AUTORISÉ', participant.atelier, heure, date);
+                        syncToServer(code, participant.nom, heure, date, currentMode, currentListName);
+                    } else if (estMauvaisMode) {
+                        // MAUVAIS MODE - NON AUTORISÉ ⚠️ Orange + 3 bips graves
+                        stats.ko++;
+                        beepMauvaisMode();
+                        showResultCustom('warning', participant.nom, 'MAUVAIS MODE', participant.atelier, heure, date);
+                    } else {
+                        // AUTRE RAISON (ne figure pas sur la liste pour ce type)
+                        stats.ko++;
+                        beepNonAutorise();
+                        showResultCustom('error', code, 'NON AUTORISÉ', '', '', '');
+                    }
+                }
             } else {
+                // Personne ne figure pas sur la liste - NON AUTORISÉ ❌ Rouge + 5 bips graves
                 beepNonAutorise();
                 stats.ko++;
                 showResultCustom('error', code, 'NON AUTORISÉ', '', '', '');
@@ -818,6 +884,24 @@
                 gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
                 osc.start();
                 osc.stop(ctx.currentTime + 0.15);
+            } catch (e) {}
+        }
+
+        function beepMauvaisMode() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                for (let i = 0; i < 3; i++) {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.frequency.value = 250;
+                    const startTime = ctx.currentTime + (i * 0.15);
+                    gain.gain.setValueAtTime(0.3, startTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.12);
+                    osc.start(startTime);
+                    osc.stop(startTime + 0.12);
+                }
             } catch (e) {}
         }
 
