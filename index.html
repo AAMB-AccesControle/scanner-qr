@@ -6,6 +6,1124 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <title>Scanner QR - Contrôle Accès</title>
+    
+    <!-- Bibliothèque pour scanner les QR codes avec la caméra -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+    
+    <style>
+        /* ========================================
+           STYLES GÉNÉRAUX
+           ======================================== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 8px;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ========================================
+           EN-TÊTE DE L'APPLICATION
+           ======================================== */
+        .header {
+            background: white;
+            border-radius: 12px 12px 0 0;
+            padding: 8px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            color: #1f2937;
+            font-size: 18px;
+            margin-bottom: 2px;
+        }
+
+        .header p {
+            color: #6b7280;
+            font-size: 11px;
+        }
+
+        /* Statut du cache (chargé, en cours, erreur) */
+        .cache-status {
+            font-size: 9px;
+            color: #6b7280;
+            margin-top: 2px;
+        }
+
+        .cache-status.loading {
+            color: #f59e0b;
+        }
+
+        .cache-status.ready {
+            color: #10b981;
+        }
+
+        .cache-status.error {
+            color: #ef4444;
+        }
+
+        /* ========================================
+           BOX DE CONFIGURATION API
+           ======================================== */
+        .config-box {
+            background: #fef3c7;
+            border-left: 3px solid #f59e0b;
+            padding: 8px;
+            margin: 0;
+            color: #92400e;
+            font-size: 11px;
+        }
+
+        .config-box.success {
+            background: #d1fae5;
+            border-color: #10b981;
+            color: #065f46;
+        }
+
+        /* Champ de saisie de l'URL API */
+        .config-box input {
+            width: 100%;
+            padding: 6px;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            font-size: 12px;
+            margin: 4px 0;
+        }
+
+        /* Menu déroulant pour sélectionner la liste de contrôle */
+        .config-box select {
+            width: 100%;
+            padding: 6px;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            font-size: 12px;
+            margin: 4px 0;
+            background: white;
+        }
+
+        /* Grille des boutons de configuration (Enregistrer, Charger cache) */
+        .config-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px;
+        }
+
+        .config-box button {
+            padding: 6px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 11px;
+        }
+
+        .btn-cache {
+            background: #10b981;
+        }
+
+        .btn-mode {
+            background: #3b82f6;
+        }
+
+        /* ========================================
+           ZONE DU SCANNER
+           ======================================== */
+        .scanner-box {
+            background: white;
+            padding: 8px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Grille des boutons de contrôle (Actif, Flash, Mode) */
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 6px;
+            margin-bottom: 6px;
+        }
+
+        /* Style des boutons */
+        .btn {
+            padding: 8px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+
+        .btn-start {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-stop {
+            background: #ef4444;
+            color: white;
+        }
+
+        /* Indicateur de statut du scanner (Actif/Arrêté) */
+        #scannerStatus {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 600;
+            display: inline-block;
+            margin-bottom: 6px;
+            text-align: center;
+        }
+
+        #scannerStatus.active {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        #scannerStatus.inactive {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        /* Indicateur de la liste actuellement sélectionnée */
+        .list-indicator {
+            display: inline-block;
+            padding: 4px 12px;
+            background: #f3f4f6;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+
+        .list-indicator.active {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        /* Zone vidéo du scanner QR */
+        #reader {
+            border: 3px solid #667eea;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #000;
+            flex: 0 0 400px;
+        }
+
+        /* ========================================
+           SECTION INFÉRIEURE
+           ======================================== */
+        .bottom-section {
+            background: white;
+            border-radius: 0 0 12px 12px;
+            padding: 8px;
+            box-shadow: 0 -2px 4px rgba(0,0,0,0.1);
+        }
+
+        /* Section de saisie manuelle du code */
+        .manual-section {
+            margin-bottom: 6px;
+        }
+
+        .manual-section h3 {
+            color: #4b5563;
+            font-size: 11px;
+            margin-bottom: 6px;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 6px;
+        }
+
+        .input-group input {
+            flex: 1;
+            padding: 8px;
+            border: 2px solid #e5e7eb;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+
+        .input-group button {
+            padding: 8px 16px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        /* Affichage des statistiques (OK/KO) */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 6px;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 6px;
+            background: #f3f4f6;
+            border-radius: 6px;
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #1f2937;
+        }
+
+        .stat-label {
+            font-size: 10px;
+            color: #6b7280;
+        }
+
+        /* ========================================
+           POPUP DE RÉSULTAT (Autorisé/Refusé)
+           ======================================== */
+        .result {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90%;
+            max-width: 500px;
+            padding: 25px;
+            border-radius: 16px;
+            text-align: center;
+            animation: zoomIn 0.3s ease;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            z-index: 1000;
+        }
+
+        @keyframes zoomIn {
+            from { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+            to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        }
+
+        /* Résultat positif (vert) */
+        .result.success {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+        }
+
+        /* Résultat d'avertissement (orange - mauvais mode) */
+        .result.warning {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: white;
+        }
+
+        /* Résultat négatif (rouge) */
+        .result.error {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+        }
+
+        .result-icon {
+            font-size: 60px;
+            margin-bottom: 10px;
+        }
+
+        .result-name {
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .result-message {
+            font-size: 20px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        .result-atelier {
+            font-size: 28px;
+            font-weight: bold;
+            padding: 15px 25px;
+            background: rgba(255,255,255,0.25);
+            border-radius: 12px;
+            display: inline-block;
+            margin-top: 12px;
+        }
+
+        .result-time {
+            margin-top: 10px;
+            font-size: 11px;
+            opacity: 0.9;
+        }
+
+        @media (max-width: 480px) {
+            .result-name { font-size: 24px; }
+            .result-atelier { font-size: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- ========================================
+             EN-TÊTE : Titre et statut du cache
+             ======================================== -->
+        <div class="header">
+            <h1>🎫 Contrôle d'Accès</h1>
+            <p>Scanner automatique v2.0</p>
+            <div class="cache-status" id="cacheStatus">⏳ Chargement...</div>
+        </div>
+
+        <!-- ========================================
+             CONFIGURATION : URL API et sélection liste
+             ======================================== -->
+        <div class="config-box" id="configBox">
+            <strong>⚙️ Configuration</strong>
+            <!-- Champ pour saisir l'URL de l'API Google Apps Script -->
+            <input type="text" id="apiUrl" placeholder="URL API Google Apps Script">
+            
+            <!-- Sélecteur de liste de contrôle -->
+            <div style="margin: 6px 0;">
+                <label style="font-size: 11px;">📋 Sélectionner la liste:</label>
+                <select id="listSelect" onchange="changeList()">
+                    <option value="">Chargement...</option>
+                </select>
+            </div>
+            
+            <!-- Boutons Enregistrer et Charger cache -->
+            <div class="config-buttons">
+                <button onclick="saveConfig()">💾 Enregistrer</button>
+                <button class="btn-cache" onclick="loadCache()">📥 Charger cache</button>
+            </div>
+        </div>
+
+        <!-- ========================================
+             ZONE SCANNER : Contrôles et vidéo
+             ======================================== -->
+        <div class="scanner-box">
+            <!-- Boutons de contrôle : Activer scanner, Flash, Mode Atelier/Conférence -->
+            <div class="controls">
+                <button class="btn btn-start" id="cameraBtnToggle" onclick="toggleCamera()">
+                    📷 Actif
+                </button>
+                <button class="btn" id="flashBtn" style="background: #667eea; color: white;" onclick="toggleFlash()">
+                    🔦 Flash OFF
+                </button>
+                <button class="btn" id="modeBtn" style="background: #f59e0b; color: white;" onclick="toggleMode()">
+                    🏭 Atelier
+                </button>
+            </div>
+            
+            <!-- Indicateurs de statut -->
+            <div>
+                <div id="scannerStatus" class="inactive">⚫ Arrêté</div>
+                <span class="list-indicator" id="listIndicator">📋 -</span>
+            </div>
+            
+            <!-- Zone vidéo pour le scanner QR -->
+            <div id="reader"></div>
+        </div>
+
+        <!-- ========================================
+             SECTION INFÉRIEURE : Saisie manuelle et stats
+             ======================================== -->
+        <div class="bottom-section">
+            <!-- Saisie manuelle d'un code -->
+            <div class="manual-section">
+                <h3>✍️ Manuel</h3>
+                <div class="input-group">
+                    <input type="text" id="manualCode" placeholder="Code">
+                    <button onclick="checkManual()">✓</button>
+                </div>
+            </div>
+
+            <!-- Statistiques OK / KO -->
+            <div class="stats">
+                <div class="stat-item">
+                    <div class="stat-value" id="statOK">0</div>
+                    <div class="stat-label">✅ OK</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="statKO">0</div>
+                    <div class="stat-label">❌ KO</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Zone pour afficher le résultat du scan (popup) -->
+    <div id="result"></div>
+
+    <script>
+        /* ========================================
+           VARIABLES GLOBALES
+           ======================================== */
+        let scanner = null;                    // Instance du scanner QR
+        let apiUrl = localStorage.getItem('apiUrl') || '';  // URL de l'API Google Apps Script
+        let stats = JSON.parse(localStorage.getItem('stats') || '{"ok":0,"ko":0}');  // Statistiques des scans
+        let scanning = false;                  // Indique si un scan est en cours (pour éviter les doublons)
+        let scannerActive = false;             // Indique si la caméra est active
+        let localCache = [];                   // Cache local des participants
+        let usingCache = false;                // Indique si le cache est chargé
+        let currentMode = 'atelier';           // Mode actuel : 'atelier' ou 'conference'
+        let flashEnabled = false;              // État de la lampe torche
+        let currentListName = '';              // Nom de la liste actuellement sélectionnée
+        let availableLists = [];               // Liste de toutes les listes disponibles
+
+        /* ========================================
+           INITIALISATION AU CHARGEMENT DE LA PAGE
+           ======================================== */
+        window.onload = () => {
+            // Charger les statistiques
+            updateStats();
+            
+            // Restaurer l'URL API si elle existe
+            if (apiUrl) {
+                document.getElementById('apiUrl').value = apiUrl;
+                document.getElementById('configBox').className = 'config-box success';
+            }
+            
+            // Restaurer le mode et la liste depuis localStorage
+            currentMode = localStorage.getItem('scanMode') || 'atelier';
+            currentListName = localStorage.getItem('currentList') || '';
+            
+            // Mettre à jour l'affichage
+            updateModeDisplay();
+            loadAvailableLists();
+        };
+
+        /* ========================================
+           GESTION DES LISTES DE CONTRÔLE
+           ======================================== */
+        
+        /**
+         * Charge les listes disponibles depuis l'API
+         */
+        async function loadAvailableLists() {
+            const statusEl = document.getElementById('cacheStatus');
+            
+            if (!apiUrl) {
+                statusEl.className = 'cache-status error';
+                statusEl.textContent = '❌ API non configurée';
+                return;
+            }
+
+            try {
+                const response = await fetch(`${apiUrl}?action=getActiveLists&t=${Date.now()}`);
+                const data = await response.json();
+
+                console.log('Réponse API:', data);
+
+                if (data.success && data.lists) {
+                    availableLists = data.lists;
+                    console.log('Listes reçues:', availableLists);
+                    updateListSelect();
+                    
+                    const activeLists = availableLists.filter(l => l.estActive);
+                    console.log('Listes actives:', activeLists);
+                    
+                    if (activeLists.length > 0) {
+                        statusEl.className = 'cache-status ready';
+                        statusEl.textContent = `✅ ${activeLists.length} liste(s) active(s)`;
+                    } else {
+                        statusEl.className = 'cache-status error';
+                        statusEl.textContent = '⚠️ Aucune liste active';
+                    }
+                } else {
+                    statusEl.className = 'cache-status error';
+                    statusEl.textContent = '❌ Erreur: ' + (data.error || 'Réponse invalide');
+                    console.error('Erreur dans la réponse:', data);
+                }
+            } catch (e) {
+                console.error('Erreur:', e);
+                statusEl.className = 'cache-status error';
+                statusEl.textContent = '❌ Erreur connexion';
+            }
+        }
+
+        /**
+         * Met à jour le menu déroulant des listes
+         * Affiche uniquement les listes actives (date et heure actuelles)
+         */
+        function updateListSelect() {
+            const select = document.getElementById('listSelect');
+            select.innerHTML = '';
+
+            // Filtrer uniquement les listes actives (date + heure actuelles)
+            const activeLists = availableLists.filter(l => l.estActive);
+
+            if (activeLists.length === 0) {
+                select.innerHTML = '<option value="">Aucune liste active</option>';
+                return;
+            }
+
+            // Ajouter uniquement les listes actives avec juste le nom
+            activeLists.forEach(list => {
+                const option = document.createElement('option');
+                option.value = list.nom;
+                option.textContent = list.nom;
+                select.appendChild(option);
+            });
+
+            // Sélectionner la liste actuelle ou la première
+            if (currentListName && activeLists.find(l => l.nom === currentListName)) {
+                select.value = currentListName;
+            } else {
+                select.value = activeLists[0].nom;
+                currentListName = activeLists[0].nom;
+                localStorage.setItem('currentList', currentListName);
+            }
+
+            updateListIndicator();
+            updateModeButtonVisibility();
+        }
+
+        /**
+         * Appelée quand l'utilisateur change de liste
+         * Charge automatiquement le cache de la nouvelle liste
+         */
+        function changeList() {
+            const select = document.getElementById('listSelect');
+            currentListName = select.value.trim();
+
+            if (!currentListName) {
+                alert('Sélectionnez une liste');
+                return;
+            }
+
+            localStorage.setItem('currentList', currentListName);
+            updateListIndicator();
+            updateModeButtonVisibility();
+            loadCache();  // Charge automatiquement le cache
+        }
+
+        /**
+         * Met à jour l'indicateur visuel de la liste sélectionnée
+         */
+        function updateListIndicator() {
+            const indicator = document.getElementById('listIndicator');
+            const selectedList = availableLists.find(l => l.nom === currentListName);
+
+            if (selectedList) {
+                const activeClass = selectedList.estActive ? 'active' : '';
+                const status = selectedList.estActive ? '🟢' : '⚫';
+                indicator.textContent = `${status} ${currentListName}`;
+                indicator.className = `list-indicator ${activeClass}`;
+            } else {
+                indicator.textContent = '📋 -';
+                indicator.className = 'list-indicator';
+            }
+        }
+
+        /* ========================================
+           GESTION DU MODE ATELIER/CONFÉRENCE
+           ======================================== */
+        
+        /**
+         * Bascule entre mode ATELIER et CONFÉRENCE
+         */
+        function toggleMode() {
+            currentMode = currentMode === 'atelier' ? 'conference' : 'atelier';
+            localStorage.setItem('scanMode', currentMode);
+            updateModeDisplay();
+        }
+
+        /**
+         * Met à jour l'affichage du bouton Mode
+         */
+        function updateModeDisplay() {
+            const btn = document.getElementById('modeBtn');
+            
+            if (currentMode === 'atelier') {
+                btn.textContent = '🏭 Atelier';
+                btn.style.background = '#f59e0b';
+            } else {
+                btn.textContent = '🎤 Conférence';
+                btn.style.background = '#10b981';
+            }
+        }
+
+        /**
+         * Masque le bouton Mode pour les listes à lieu unique
+         * (AG, GALA, TERROIR, MIDI - MER, MIDI - JEU)
+         */
+        function updateModeButtonVisibility() {
+            const btn = document.getElementById('modeBtn');
+            const singleLocationLists = ['AG', 'TERROIR', 'GALA', 'MIDI - MER', 'MIDI - JEU'];
+            
+            if (singleLocationLists.includes(currentListName)) {
+                btn.style.display = 'none';
+            } else {
+                btn.style.display = 'block';
+            }
+        }
+
+        /**
+         * Retourne le nom du lieu pour les listes à lieu unique
+         * @returns {string|null} Nom du lieu ou null si liste multi-lieux
+         */
+        function getSingleLocationName(listName) {
+            const locationMap = {
+                'AG': 'Assemblée Générale',
+                'TERROIR': 'Terroir',
+                'GALA': 'Gala',
+                'MIDI - MER': 'MIDI - Mercredi',
+                'MIDI - JEU': 'MIDI - Jeudi'
+            };
+            return locationMap[listName] || null;
+        }
+
+        /* ========================================
+           GESTION DE LA CONFIGURATION API
+           ======================================== */
+        
+        /**
+         * Enregistre l'URL de l'API dans localStorage
+         */
+        function saveConfig() {
+            const url = document.getElementById('apiUrl').value.trim();
+            if (!url) {
+                alert('Entrez une URL');
+                return;
+            }
+            if (!url.includes('script.google.com')) {
+                alert('URL invalide');
+                return;
+            }
+            apiUrl = url;
+            localStorage.setItem('apiUrl', url);
+            document.getElementById('configBox').className = 'config-box success';
+            loadAvailableLists();
+        }
+
+        /**
+         * Charge le cache des participants de la liste sélectionnée
+         */
+        async function loadCache() {
+            const statusEl = document.getElementById('cacheStatus');
+            statusEl.className = 'cache-status loading';
+            statusEl.textContent = '⏳ Chargement cache...';
+
+            if (!apiUrl) {
+                statusEl.className = 'cache-status error';
+                statusEl.textContent = '❌ API non configurée';
+                return;
+            }
+
+            if (!currentListName) {
+                statusEl.className = 'cache-status error';
+                statusEl.textContent = '❌ Sélectionnez une liste';
+                return;
+            }
+
+            try {
+                const response = await fetch(`${apiUrl}?action=getAll&listeName=${encodeURIComponent(currentListName)}&t=${Date.now()}`);
+                const data = await response.json();
+
+                if (data.success && data.participants) {
+                    localCache = data.participants;
+                    localStorage.setItem('localCache', JSON.stringify(localCache));
+                    localStorage.setItem('currentListCache', currentListName);
+                    usingCache = true;
+
+                    statusEl.className = 'cache-status ready';
+                    statusEl.textContent = `✅ Cache chargé (${localCache.length} personnes) - ${currentListName}`;
+                    console.log(`Cache chargé : ${localCache.length} participants pour ${currentListName}`);
+                } else {
+                    statusEl.className = 'cache-status error';
+                    statusEl.textContent = '❌ Impossible de charger le cache';
+                }
+            } catch (e) {
+                console.error('Erreur cache:', e);
+                statusEl.className = 'cache-status error';
+                statusEl.textContent = '❌ Erreur connexion';
+            }
+        }
+
+        /* ========================================
+           GESTION DU SCANNER QR
+           ======================================== */
+        
+        /**
+         * Bascule l'état de la caméra (démarrer/arrêter)
+         */
+        function toggleCamera() {
+            if (scannerActive) {
+                stopScanner();
+            } else {
+                startScanner();
+            }
+        }
+
+        /**
+         * Démarre le scanner QR avec la caméra
+         */
+        async function startScanner() {
+            if (!apiUrl) {
+                alert('Configurez l\'API');
+                return;
+            }
+
+            if (!currentListName) {
+                alert('Sélectionnez une liste');
+                return;
+            }
+
+            if (!usingCache) {
+                alert('Chargez le cache d\'abord');
+                return;
+            }
+
+            if (scannerActive) return;
+
+            try {
+                scanner = new Html5Qrcode("reader");
+                await scanner.start(
+                    { facingMode: "environment" },  // Caméra arrière
+                    { fps: 10, qrbox: { width: 200, height: 200 } },  // Paramètres du scan
+                    onScanSuccess,   // Callback succès
+                    () => {}         // Callback erreur (ignorée)
+                );
+                scannerActive = true;
+                const btn = document.getElementById('cameraBtnToggle');
+                btn.textContent = '⏹️ Arrêter';
+                btn.className = 'btn btn-stop';
+                document.getElementById('scannerStatus').className = 'active';
+                document.getElementById('scannerStatus').textContent = '🟢 Actif';
+            } catch (err) {
+                console.error(err);
+                alert('Erreur caméra');
+            }
+        }
+
+        /**
+         * Arrête le scanner QR
+         */
+        function stopScanner() {
+            if (scanner && scannerActive) {
+                scanner.stop().then(() => {
+                    scannerActive = false;
+                    const btn = document.getElementById('cameraBtnToggle');
+                    btn.textContent = '📷 Actif';
+                    btn.className = 'btn btn-start';
+                    document.getElementById('scannerStatus').className = 'inactive';
+                    document.getElementById('scannerStatus').textContent = '⚫ Arrêté';
+                    flashEnabled = false;
+                    const flashBtn = document.getElementById('flashBtn');
+                    flashBtn.textContent = '🔦 Flash OFF';
+                    flashBtn.style.background = '#667eea';
+                });
+            }
+        }
+
+        /**
+         * Active/désactive la lampe torche
+         */
+        function toggleFlash() {
+            if (!scannerActive) {
+                alert('Démarrez le scanner d\'abord');
+                return;
+            }
+
+            flashEnabled = !flashEnabled;
+            const btn = document.getElementById('flashBtn');
+            
+            if (scanner) {
+                scanner.applyVideoConstraints({
+                    advanced: [{ torch: flashEnabled }]
+                }).then(() => {
+                    if (flashEnabled) {
+                        btn.textContent = '🔦 Flash ON';
+                        btn.style.background = '#fbbf24';
+                    } else {
+                        btn.textContent = '🔦 Flash OFF';
+                        btn.style.background = '#667eea';
+                    }
+                }).catch(err => {
+                    console.log('Flash non supporté:', err);
+                    alert('Flash non supporté sur cet appareil');
+                    flashEnabled = false;
+                    btn.textContent = '🔦 Flash OFF';
+                    btn.style.background = '#667eea';
+                });
+            }
+        }
+
+        /**
+         * Callback appelé quand un QR code est scanné avec succès
+         */
+        function onScanSuccess(code) {
+            if (scanning) return;  // Éviter les scans multiples
+            scanning = true;
+            scanner.pause(true);   // Pause le scanner pendant la vérification
+            verifyCodeLocal(code);
+        }
+
+        /**
+         * Vérifie un code saisi manuellement
+         */
+        function checkManual() {
+            const code = document.getElementById('manualCode').value.trim();
+            if (!code) {
+                alert('Entrez un code');
+                return;
+            }
+            if (scannerActive) scanner.pause(true);
+            scanning = true;
+            verifyCodeLocal(code);
+            document.getElementById('manualCode').value = '';
+        }
+
+        /* ========================================
+           VÉRIFICATION DES CODES
+           ======================================== */
+        
+        /**
+         * Vérifie un code dans le cache local
+         * @param {string} code - Code QR ou code saisi manuellement
+         */
+        function verifyCodeLocal(code) {
+            const now = new Date();
+            const heure = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0') + ':' + String(now.getSeconds()).padStart(2, '0');
+            const date = String(now.getDate()).padStart(2, '0') + '/' + String(now.getMonth() + 1).padStart(2, '0') + '/' + now.getFullYear();
+
+            // Chercher le participant dans le cache local
+            const participant = localCache.find(p => p.code.toLowerCase() === code.toLowerCase());
+
+            if (participant) {
+                // Vérifier si c'est une liste avec un seul lieu (AG, GALA, TERROIR, MIDI - MER, MIDI - JEU)
+                const singleLocation = getSingleLocationName(currentListName);
+                
+                if (singleLocation) {
+                    // ✅ LISTES À LIEU UNIQUE : Personne trouvée = AUTORISÉE
+                    stats.ok++;
+                    beepAtelierA();  // 1 bip aigu
+                    showResultCustom('success', participant.nom, 'AUTORISÉ', singleLocation, heure, date);
+                    syncToServer(code, participant.nom, heure, date, singleLocation, currentListName);
+                } else {
+                    // 📍 LISTES MULTI-LIEUX (CONFERENCE, ATELIER A, ATELIER B)
+                    const participantType = String(participant.atelier).trim().toUpperCase();
+                    
+                    // Définir les types attendus selon le mode
+                    let typeAttendu = [];
+                    if (currentMode === 'atelier') {
+                        typeAttendu = ['ATELIER A', 'ATELIER B'];
+                    } else if (currentMode === 'conference') {
+                        typeAttendu = ['CONFERENCE'];
+                    }
+                    
+                    // Vérifier si le participant correspond au mode sélectionné
+                    const estAutorise = typeAttendu.some(t => participantType === t.toUpperCase());
+                    
+                    // Vérifier si le participant est du mauvais type (mauvais mode)
+                    const estMauvaisMode = (currentMode === 'atelier' && participantType === 'CONFERENCE') ||
+                                          (currentMode === 'conference' && (participantType === 'ATELIER A' || participantType === 'ATELIER B'));
+                    
+                    if (estAutorise) {
+                        // ✅ BON MODE - AUTORISÉ (Vert + 1 bip aigu)
+                        stats.ok++;
+                        beepAtelierA();
+                        showResultCustom('success', participant.nom, 'AUTORISÉ', participant.atelier, heure, date);
+                        syncToServer(code, participant.nom, heure, date, currentMode, currentListName);
+                    } else if (estMauvaisMode) {
+                        // ⚠️ MAUVAIS MODE - NON AUTORISÉ (Orange + 3 bips graves)
+                        stats.ko++;
+                        beepMauvaisMode();
+                        showResultCustom('warning', participant.nom, 'MAUVAIS MODE', participant.atelier, heure, date);
+                    } else {
+                        // ❌ AUTRE RAISON (ne figure pas sur la liste pour ce type)
+                        stats.ko++;
+                        beepNonAutorise();
+                        showResultCustom('error', code, 'NON AUTORISÉ', '', '', '');
+                    }
+                }
+            } else {
+                // ❌ Personne ne figure pas sur la liste - NON AUTORISÉ (Rouge + 5 bips graves)
+                beepNonAutorise();
+                stats.ko++;
+                showResultCustom('error', code, 'NON AUTORISÉ', '', '', '');
+            }
+
+            // Sauvegarder les statistiques
+            localStorage.setItem('stats', JSON.stringify(stats));
+            updateStats();
+
+            // Reprendre le scan après 3 secondes
+            setTimeout(resumeScanner, 3000);
+        }
+
+        /**
+         * Reprend le scanner après affichage du résultat
+         */
+        function resumeScanner() {
+            scanning = false;
+            if (scanner && scannerActive) {
+                scanner.resume();
+            }
+        }
+
+        /**
+         * Synchronise les données avec le serveur Google Apps Script
+         */
+        async function syncToServer(code, nom, heure, date, mode, listeName) {
+            try {
+                await fetch(`${apiUrl}?code=${encodeURIComponent(code)}&heure=${encodeURIComponent(heure)}&date=${encodeURIComponent(date)}&lieu=${encodeURIComponent(mode)}&listeName=${encodeURIComponent(listeName)}&sync=1&t=${Date.now()}`);
+            } catch (e) {
+                console.log('Sync échouée');
+            }
+        }
+
+        /* ========================================
+           AFFICHAGE DES RÉSULTATS
+           ======================================== */
+        
+        /**
+         * Affiche le résultat du scan dans une popup
+         * @param {string} type - 'success', 'warning', ou 'error'
+         * @param {string} nom - Nom du participant
+         * @param {string} statut - Statut à afficher (AUTORISÉ, NON AUTORISÉ, etc.)
+         * @param {string} atelier - Type d'atelier/conférence
+         * @param {string} heure - Heure du scan
+         * @param {string} date - Date du scan
+         */
+        function showResultCustom(type, nom, statut, atelier, heure, date) {
+            let icon = '';
+            
+            if (type === 'success') {
+                icon = '✅';
+            } else if (type === 'warning') {
+                icon = '⚠️';
+            } else if (type === 'error') {
+                icon = '❌';
+            }
+            
+            const time = (heure && date) ? `<div class="result-time">${date} à ${heure}</div>` : '';
+            
+            // Afficher la popup de résultat
+            document.getElementById('result').innerHTML = `
+                <div class="result ${type}">
+                    <div class="result-icon">${icon}</div>
+                    <div class="result-name">${esc(nom)}</div>
+                    <div class="result-message">${esc(statut)}</div>
+                    <div class="result-atelier">${esc(atelier)}</div>
+                    ${time}
+                </div>
+            `;
+
+            // Masquer la popup après 3 secondes
+            setTimeout(() => {
+                document.getElementById('result').innerHTML = '';
+            }, 3000);
+        }
+
+        /**
+         * Met à jour l'affichage des statistiques
+         */
+        function updateStats() {
+            document.getElementById('statOK').textContent = stats.ok;
+            document.getElementById('statKO').textContent = stats.ko;
+        }
+
+        /**
+         * Échappe le HTML pour éviter les injections XSS
+         */
+        function esc(txt) {
+            const div = document.createElement('div');
+            div.textContent = txt;
+            return div.innerHTML;
+        }
+
+        /* ========================================
+           SONS DE NOTIFICATION
+           ======================================== */
+        
+        /**
+         * Bip aigu : Code autorisé (1 bip)
+         */
+        function beepAtelierA() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.frequency.value = 1000;  // Fréquence aiguë
+                gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.15);
+            } catch (e) {}
+        }
+
+        /**
+         * 3 bips graves : Mauvais mode (Atelier/Conférence)
+         */
+        function beepMauvaisMode() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                for (let i = 0; i < 3; i++) {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.frequency.value = 250;  // Fréquence grave
+                    const startTime = ctx.currentTime + (i * 0.15);
+                    gain.gain.setValueAtTime(0.3, startTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.12);
+                    osc.start(startTime);
+                    osc.stop(startTime + 0.12);
+                }
+            } catch (e) {}
+        }
+
+        /**
+         * 5 bips graves : Non autorisé (pas dans la liste)
+         */
+        function beepNonAutorise() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                for (let i = 0; i < 5; i++) {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.frequency.value = 250;  // Fréquence grave
+                    const startTime = ctx.currentTime + (i * 0.15);
+                    gain.gain.setValueAtTime(0.3, startTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.12);
+                    osc.start(startTime);
+                    osc.stop(startTime + 0.12);
+                }
+            } catch (e) {}
+        }
+    </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Scanner QR - Contrôle Accès</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
     <style>
         * {
@@ -350,7 +1468,7 @@
     <div class="container">
         <div class="header">
             <h1>🎫 Contrôle d'Accès</h1>
-            <p>Scanner automatique v2.7</p>
+            <p>Scanner automatique v3.0</p>
             <div class="cache-status" id="cacheStatus">⏳ Chargement...</div>
         </div>
 
@@ -366,7 +1484,6 @@
             <div class="config-buttons">
                 <button onclick="saveConfig()">💾 Enregistrer</button>
                 <button class="btn-cache" onclick="loadCache()">📥 Charger cache</button>
-                <button class="btn-mode" id="modeBtn" onclick="toggleMode()">📍 Mode</button>
             </div>
         </div>
 
