@@ -388,7 +388,7 @@
              ======================================== -->
         <div class="header">
             <h1>🎫 Contrôle d'Accès</h1>
-            <p>Scanner automatique v44444</p>
+            <p>Scanner automatique v1.2.3.4</p>
             <div class="cache-status" id="cacheStatus">⏳ Chargement...</div>
         </div>
 
@@ -926,7 +926,7 @@
                     let typeAttendu = [];
                     if (currentMode === 'atelier') {
                         typeAttendu = ['ATELIER A', 'ATELIER B'];
-                    } else if (currentMode === 'conférence') {
+                    } else if (currentMode === 'conference') {
                         typeAttendu = ['CONFERENCE'];
                     }
                     
@@ -1894,7 +1894,7 @@
                     let typeAttendu = [];
                     if (currentMode === 'atelier') {
                         typeAttendu = ['ATELIER A', 'ATELIER B'];
-                    } else if (currentMode === 'conference') {
+                    } else if (currentMode === 'conférence') {
                         typeAttendu = ['CONFERENCE'];
                     }
                     
@@ -1903,7 +1903,7 @@
                     
                     // Vérifier si le participant est du mauvais type (mauvais mode)
                     const estMauvaisMode = (currentMode === 'atelier' && participantType === 'CONFERENCE') ||
-                                          (currentMode === 'conference' && (participantType === 'ATELIER A' || participantType === 'ATELIER B'));
+                                          (currentMode === 'conférence' && (participantType === 'ATELIER A' || participantType === 'ATELIER B'));
                     
                     if (estAutorise) {
                         // BON MODE - AUTORISÉ ✅ Vert + 1 bip aigu
