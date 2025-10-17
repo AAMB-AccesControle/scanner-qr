@@ -1,34 +1,3 @@
-OK
-- Affichage des listes fonctions de la date et heureOK : 
-- chargement automatique de la liste en cache dès sélection de la liste
-- Appareil photo
-- Flash
-- Bouton CONFERENCE/ATELIER
-
-USAGE :
-- Terroir : Liste chargée, scan OK
-- MIDI - MER : Liste chargée, scan OK
-- MAR - PM 1 : Liste chargée
-	Mode ATELIER :
-		- Atelier A : Vert/Autorisé OK
-		- Atelier B : Vert/Autorisé OK
-		- Conférence : Rouge/ Pas Autorisé NOK!!!!!!!!!!!!!!
-	Mode CONFERENCE :
-		- Atelier A : Orange / Pas Autorisé NOK!!!!!!!!!!!!!!
-		- Atelier B : Orange / Pas Autorisé NOK!!!!!!!!!!!!!!
-		- Conférence : Rouge/ Pas Autorisé NOK!!!!!!!!!!!!!!
-
-
--------------------------------------------------------------------------------------------------------------------------------------
--------------------------------------------------------------------------------------------------------------------------------------
--------------------------------------------------------------------------------------------------------------------------------------
--------------------------------------------------------------------------------------------------------------------------------------
--------------------------------------------------------------------------------------------------------------------------------------
--------------------------------------------------------------------------------------------------------------------------------------
-
-
-
-
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -307,29 +276,31 @@ USAGE :
             font-size: 13px;
         }
 
-        /* Affichage des statistiques (OK/KO) */
+        /* Affichage des statistiques - Sous les boutons de contrôle */
         .stats {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: 1fr 1fr 1fr;
             gap: 6px;
+            margin-bottom: 8px;
         }
 
         .stat-item {
             text-align: center;
-            padding: 6px;
+            padding: 4px;
             background: #f3f4f6;
             border-radius: 6px;
         }
 
         .stat-value {
-            font-size: 20px;
+            font-size: 14px;
             font-weight: bold;
             color: #1f2937;
         }
 
         .stat-label {
-            font-size: 10px;
+            font-size: 8px;
             color: #6b7280;
+            margin-top: 2px;
         }
 
         /* ========================================
@@ -419,7 +390,7 @@ USAGE :
              ======================================== -->
         <div class="header">
             <h1>🎫 Contrôle d'Accès</h1>
-            <p>Scanner automatique v3.3333</p>
+            <p>Scanner automatique v2.0</p>
             <div class="cache-status" id="cacheStatus">⏳ Chargement...</div>
         </div>
 
@@ -462,6 +433,20 @@ USAGE :
                     🏭 Atelier
                 </button>
             </div>
+
+            <!-- Statistiques personnelles et globales -->
+            <div class="stats">
+                <div class="stat-item">
+                    <div class="stat-value" id="statPersonnelOK">0</div>
+                    <div class="stat-label">✅ Mes Autorisés / ⚠️ Mes Mauvais mode</div>
+                    <div class="stat-value" id="statPersonnelKO">0</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="statGlobalOK">0</div>
+                    <div class="stat-label">🌍 Total Autorisés / ⚠️ Total Mauvais mode</div>
+                    <div class="stat-value" id="statGlobalKO">0</div>
+                </div>
+            </div>
             
             <!-- Indicateurs de statut -->
             <div>
@@ -474,7 +459,7 @@ USAGE :
         </div>
 
         <!-- ========================================
-             SECTION INFÉRIEURE : Saisie manuelle et stats
+             SECTION INFÉRIEURE : Saisie manuelle uniquement
              ======================================== -->
         <div class="bottom-section">
             <!-- Saisie manuelle d'un code -->
@@ -483,18 +468,6 @@ USAGE :
                 <div class="input-group">
                     <input type="text" id="manualCode" placeholder="Code">
                     <button onclick="checkManual()">✓</button>
-                </div>
-            </div>
-
-            <!-- Statistiques OK / KO -->
-            <div class="stats">
-                <div class="stat-item">
-                    <div class="stat-value" id="statOK">0</div>
-                    <div class="stat-label">✅ OK</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value" id="statKO">0</div>
-                    <div class="stat-label">❌ KO</div>
                 </div>
             </div>
         </div>
@@ -509,7 +482,7 @@ USAGE :
            ======================================== */
         let scanner = null;                    // Instance du scanner QR
         let apiUrl = localStorage.getItem('apiUrl') || '';  // URL de l'API Google Apps Script
-        let stats = JSON.parse(localStorage.getItem('stats') || '{"ok":0,"ko":0}');  // Statistiques des scans
+        let stats = JSON.parse(localStorage.getItem('stats') || '{"ok":0,"ko":0}');  // Statistiques personnelles
         let scanning = false;                  // Indique si un scan est en cours (pour éviter les doublons)
         let scannerActive = false;             // Indique si la caméra est active
         let localCache = [];                   // Cache local des participants
@@ -518,6 +491,7 @@ USAGE :
         let flashEnabled = false;              // État de la lampe torche
         let currentListName = '';              // Nom de la liste actuellement sélectionnée
         let availableLists = [];               // Liste de toutes les listes disponibles
+        let statsRefreshInterval = null;       // Intervalle pour rafraîchir les stats globales
 
         /* ========================================
            INITIALISATION AU CHARGEMENT DE LA PAGE
@@ -539,6 +513,9 @@ USAGE :
             // Mettre à jour l'affichage
             updateModeDisplay();
             loadAvailableLists();
+            
+            // Démarrer le rafraîchissement des stats globales
+            startStatsRefresh();
         };
 
         /* ========================================
@@ -644,6 +621,7 @@ USAGE :
             updateListIndicator();
             updateModeButtonVisibility();
             loadCache();  // Charge automatiquement le cache
+            loadGlobalStats();  // Charge les stats globales de la nouvelle liste
         }
 
         /**
@@ -948,7 +926,7 @@ USAGE :
                     stats.ok++;
                     beepAtelierA();  // 1 bip aigu
                     showResultCustom('success', participant.nom, 'AUTORISÉ', singleLocation, heure, date);
-                    syncToServer(code, participant.nom, heure, date, singleLocation, currentListName);
+                    syncToServer(code, participant.nom, heure, date, singleLocation, currentListName, 'AUTORISE');
                 } else {
                     // 📍 LISTES MULTI-LIEUX (CONFERENCE, ATELIER A, ATELIER B)
                     const participantType = String(participant.atelier).trim().toUpperCase();
@@ -973,12 +951,13 @@ USAGE :
                         stats.ok++;
                         beepAtelierA();
                         showResultCustom('success', participant.nom, 'AUTORISÉ', participant.atelier, heure, date);
-                        syncToServer(code, participant.nom, heure, date, currentMode, currentListName);
+                        syncToServer(code, participant.nom, heure, date, currentMode, currentListName, 'AUTORISE');
                     } else if (estMauvaisMode) {
                         // ⚠️ MAUVAIS MODE - NON AUTORISÉ (Orange + 3 bips graves)
                         stats.ko++;
                         beepMauvaisMode();
                         showResultCustom('warning', participant.nom, 'MAUVAIS MODE', participant.atelier, heure, date);
+                        syncToServer(code, participant.nom, heure, date, currentMode, currentListName, 'MAUVAIS MODE');
                     } else {
                         // ❌ AUTRE RAISON (ne figure pas sur la liste pour ce type)
                         stats.ko++;
@@ -1014,9 +993,11 @@ USAGE :
         /**
          * Synchronise les données avec le serveur Google Apps Script
          */
-        async function syncToServer(code, nom, heure, date, mode, listeName) {
+        async function syncToServer(code, nom, heure, date, mode, listeName, statut) {
             try {
-                await fetch(`${apiUrl}?code=${encodeURIComponent(code)}&heure=${encodeURIComponent(heure)}&date=${encodeURIComponent(date)}&lieu=${encodeURIComponent(mode)}&listeName=${encodeURIComponent(listeName)}&sync=1&t=${Date.now()}`);
+                await fetch(`${apiUrl}?code=${encodeURIComponent(code)}&heure=${encodeURIComponent(heure)}&date=${encodeURIComponent(date)}&lieu=${encodeURIComponent(mode)}&listeName=${encodeURIComponent(listeName)}&statut=${encodeURIComponent(statut)}&sync=1&t=${Date.now()}`);
+                // Recharger les stats globales après sync
+                setTimeout(() => loadGlobalStats(), 500);
             } catch (e) {
                 console.log('Sync échouée');
             }
@@ -1059,18 +1040,66 @@ USAGE :
                 </div>
             `;
 
-            // Masquer la popup après 2 secondes
+            // Masquer la popup après 3 secondes
             setTimeout(() => {
                 document.getElementById('result').innerHTML = '';
-            }, 2000);
+            }, 3000);
         }
 
         /**
-         * Met à jour l'affichage des statistiques
+         * Met à jour l'affichage des statistiques personnelles et globales
          */
         function updateStats() {
-            document.getElementById('statOK').textContent = stats.ok;
-            document.getElementById('statKO').textContent = stats.ko;
+            // Statistiques personnelles
+            document.getElementById('statPersonnelOK').textContent = stats.ok;
+            document.getElementById('statPersonnelKO').textContent = stats.ko;
+            
+            // Charger les statistiques globales
+            loadGlobalStats();
+        }
+
+        /**
+         * Charge les statistiques globales depuis le serveur
+         */
+        async function loadGlobalStats() {
+            if (!apiUrl || !currentListName) return;
+            
+            try {
+                const response = await fetch(`${apiUrl}?action=getStats&listeName=${encodeURIComponent(currentListName)}&t=${Date.now()}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('statGlobalOK').textContent = data.totalOK || 0;
+                    document.getElementById('statGlobalKO').textContent = data.totalKO || 0;
+                }
+            } catch (e) {
+                console.log('Erreur chargement stats globales:', e);
+            }
+        }
+
+        /**
+         * Démarre le rafraîchissement automatique des stats globales
+         */
+        function startStatsRefresh() {
+            // Arrêter l'ancien intervalle s'il existe
+            if (statsRefreshInterval) {
+                clearInterval(statsRefreshInterval);
+            }
+            
+            // Rafraîchir toutes les 10 secondes
+            statsRefreshInterval = setInterval(() => {
+                loadGlobalStats();
+            }, 10000);
+        }
+
+        /**
+         * Arrête le rafraîchissement automatique des stats
+         */
+        function stopStatsRefresh() {
+            if (statsRefreshInterval) {
+                clearInterval(statsRefreshInterval);
+                statsRefreshInterval = null;
+            }
         }
 
         /**
@@ -1499,7 +1528,7 @@ USAGE :
     <div class="container">
         <div class="header">
             <h1>🎫 Contrôle d'Accès</h1>
-            <p>Scanner automatique v2.2222</p>
+            <p>Scanner automatique v.Z12ffop.</p>
             <div class="cache-status" id="cacheStatus">⏳ Chargement...</div>
         </div>
 
