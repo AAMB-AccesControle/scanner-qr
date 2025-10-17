@@ -1,3 +1,34 @@
+OK
+- Affichage des listes fonctions de la date et heureOK : 
+- chargement automatique de la liste en cache dès sélection de la liste
+- Appareil photo
+- Flash
+- Bouton CONFERENCE/ATELIER
+
+USAGE :
+- Terroir : Liste chargée, scan OK
+- MIDI - MER : Liste chargée, scan OK
+- MAR - PM 1 : Liste chargée
+	Mode ATELIER :
+		- Atelier A : Vert/Autorisé OK
+		- Atelier B : Vert/Autorisé OK
+		- Conférence : Rouge/ Pas Autorisé NOK!!!!!!!!!!!!!!
+	Mode CONFERENCE :
+		- Atelier A : Orange / Pas Autorisé NOK!!!!!!!!!!!!!!
+		- Atelier B : Orange / Pas Autorisé NOK!!!!!!!!!!!!!!
+		- Conférence : Rouge/ Pas Autorisé NOK!!!!!!!!!!!!!!
+
+
+-------------------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -388,7 +419,7 @@
              ======================================== -->
         <div class="header">
             <h1>🎫 Contrôle d'Accès</h1>
-            <p>Scanner automatique v4.5.6</p>
+            <p>Scanner automatique v3.3333</p>
             <div class="cache-status" id="cacheStatus">⏳ Chargement...</div>
         </div>
 
@@ -483,7 +514,7 @@
         let scannerActive = false;             // Indique si la caméra est active
         let localCache = [];                   // Cache local des participants
         let usingCache = false;                // Indique si le cache est chargé
-        let currentMode = 'atelier';           // Mode actuel : 'atelier' ou 'conférence'
+        let currentMode = 'atelier';           // Mode actuel : 'atelier' ou 'conference'
         let flashEnabled = false;              // État de la lampe torche
         let currentListName = '';              // Nom de la liste actuellement sélectionnée
         let availableLists = [];               // Liste de toutes les listes disponibles
@@ -634,14 +665,14 @@
         }
 
         /* ========================================
-           GESTION DU MODE ATELIER/CONFERENCE
+           GESTION DU MODE ATELIER/CONFÉRENCE
            ======================================== */
         
         /**
          * Bascule entre mode ATELIER et CONFÉRENCE
          */
         function toggleMode() {
-            currentMode = currentMode === 'atelier' ? 'conférence' : 'atelier';
+            currentMode = currentMode === 'atelier' ? 'conference' : 'atelier';
             localStorage.setItem('scanMode', currentMode);
             updateModeDisplay();
         }
@@ -919,14 +950,14 @@
                     showResultCustom('success', participant.nom, 'AUTORISÉ', singleLocation, heure, date);
                     syncToServer(code, participant.nom, heure, date, singleLocation, currentListName);
                 } else {
-                    // 📍 LISTES MULTI-LIEUX (conférence, ATELIER A, ATELIER B)
+                    // 📍 LISTES MULTI-LIEUX (CONFERENCE, ATELIER A, ATELIER B)
                     const participantType = String(participant.atelier).trim().toUpperCase();
                     
                     // Définir les types attendus selon le mode
                     let typeAttendu = [];
                     if (currentMode === 'atelier') {
                         typeAttendu = ['ATELIER A', 'ATELIER B'];
-                    } else if (currentMode === 'conférence') {
+                    } else if (currentMode === 'conference') {
                         typeAttendu = ['CONFERENCE'];
                     }
                     
@@ -935,7 +966,7 @@
                     
                     // Vérifier si le participant est du mauvais type (mauvais mode)
                     const estMauvaisMode = (currentMode === 'atelier' && participantType === 'CONFERENCE') ||
-                                          (currentMode === 'conférence' && (participantType === 'ATELIER A' || participantType === 'ATELIER B'));
+                                          (currentMode === 'conference' && (participantType === 'ATELIER A' || participantType === 'ATELIER B'));
                     
                     if (estAutorise) {
                         // ✅ BON MODE - AUTORISÉ (Vert + 1 bip aigu)
@@ -1028,10 +1059,10 @@
                 </div>
             `;
 
-            // Masquer la popup après 3 secondes
+            // Masquer la popup après 2 secondes
             setTimeout(() => {
                 document.getElementById('result').innerHTML = '';
-            }, 3000);
+            }, 2000);
         }
 
         /**
@@ -1695,7 +1726,7 @@
         }
 
         function toggleMode() {
-            currentMode = currentMode === 'atelier' ? 'conférence' : 'atelier';
+            currentMode = currentMode === 'atelier' ? 'conference' : 'atelier';
             localStorage.setItem('scanMode', currentMode);
             updateModeDisplay();
         }
@@ -1894,7 +1925,7 @@
                     let typeAttendu = [];
                     if (currentMode === 'atelier') {
                         typeAttendu = ['ATELIER A', 'ATELIER B'];
-                    } else if (currentMode === 'conférence') {
+                    } else if (currentMode === 'conference') {
                         typeAttendu = ['CONFERENCE'];
                     }
                     
@@ -1903,7 +1934,7 @@
                     
                     // Vérifier si le participant est du mauvais type (mauvais mode)
                     const estMauvaisMode = (currentMode === 'atelier' && participantType === 'CONFERENCE') ||
-                                          (currentMode === 'conférence' && (participantType === 'ATELIER A' || participantType === 'ATELIER B'));
+                                          (currentMode === 'conference' && (participantType === 'ATELIER A' || participantType === 'ATELIER B'));
                     
                     if (estAutorise) {
                         // BON MODE - AUTORISÉ ✅ Vert + 1 bip aigu
