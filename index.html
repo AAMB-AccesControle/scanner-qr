@@ -388,7 +388,7 @@
              ======================================== -->
         <div class="header">
             <h1>🎫 Contrôle d'Accès</h1>
-            <p>Scanner automatique v1.2.3.4</p>
+            <p>Scanner automatique v4.5.6</p>
             <div class="cache-status" id="cacheStatus">⏳ Chargement...</div>
         </div>
 
@@ -483,7 +483,7 @@
         let scannerActive = false;             // Indique si la caméra est active
         let localCache = [];                   // Cache local des participants
         let usingCache = false;                // Indique si le cache est chargé
-        let currentMode = 'atelier';           // Mode actuel : 'atelier' ou 'conference'
+        let currentMode = 'atelier';           // Mode actuel : 'atelier' ou 'conférence'
         let flashEnabled = false;              // État de la lampe torche
         let currentListName = '';              // Nom de la liste actuellement sélectionnée
         let availableLists = [];               // Liste de toutes les listes disponibles
@@ -634,14 +634,14 @@
         }
 
         /* ========================================
-           GESTION DU MODE ATELIER/CONFÉRENCE
+           GESTION DU MODE ATELIER/CONFERENCE
            ======================================== */
         
         /**
          * Bascule entre mode ATELIER et CONFÉRENCE
          */
         function toggleMode() {
-            currentMode = currentMode === 'atelier' ? 'conference' : 'atelier';
+            currentMode = currentMode === 'atelier' ? 'conférence' : 'atelier';
             localStorage.setItem('scanMode', currentMode);
             updateModeDisplay();
         }
@@ -919,14 +919,14 @@
                     showResultCustom('success', participant.nom, 'AUTORISÉ', singleLocation, heure, date);
                     syncToServer(code, participant.nom, heure, date, singleLocation, currentListName);
                 } else {
-                    // 📍 LISTES MULTI-LIEUX (CONFERENCE, ATELIER A, ATELIER B)
+                    // 📍 LISTES MULTI-LIEUX (conférence, ATELIER A, ATELIER B)
                     const participantType = String(participant.atelier).trim().toUpperCase();
                     
                     // Définir les types attendus selon le mode
                     let typeAttendu = [];
                     if (currentMode === 'atelier') {
                         typeAttendu = ['ATELIER A', 'ATELIER B'];
-                    } else if (currentMode === 'conference') {
+                    } else if (currentMode === 'conférence') {
                         typeAttendu = ['CONFERENCE'];
                     }
                     
@@ -935,7 +935,7 @@
                     
                     // Vérifier si le participant est du mauvais type (mauvais mode)
                     const estMauvaisMode = (currentMode === 'atelier' && participantType === 'CONFERENCE') ||
-                                          (currentMode === 'conference' && (participantType === 'ATELIER A' || participantType === 'ATELIER B'));
+                                          (currentMode === 'conférence' && (participantType === 'ATELIER A' || participantType === 'ATELIER B'));
                     
                     if (estAutorise) {
                         // ✅ BON MODE - AUTORISÉ (Vert + 1 bip aigu)
@@ -1695,7 +1695,7 @@
         }
 
         function toggleMode() {
-            currentMode = currentMode === 'atelier' ? 'conference' : 'atelier';
+            currentMode = currentMode === 'atelier' ? 'conférence' : 'atelier';
             localStorage.setItem('scanMode', currentMode);
             updateModeDisplay();
         }
