@@ -77,7 +77,7 @@
         <div class="header">
             <button class="fullscreen-btn" id="fullscreenBtn" onclick="toggleFullscreen()">⛶</button>
             <h1>🎫 Contrôle d'Accès</h1>
-            <p>Scanner automatique PleinEcran</p>
+            <p>Scanner automatique PleinEcranV2</p>
             <div class="cache-status" id="cacheStatus">⏳ Chargement...</div>
         </div>
         <div class="config-box" id="configBox">
@@ -143,14 +143,14 @@
             updateStats();
             if(apiUrl){
                 document.getElementById('apiUrl').value=apiUrl;
-                document.getElementById('configBox').className='config-box success'
+                document.getElementById('configBox').className='config-box success';
+                loadAvailableLists();
             }
             currentMode=localStorage.getItem('scanMode')||'atelier';
             currentListName=localStorage.getItem('currentList')||'';
             updateModeDisplay();
-            loadAvailableLists();
+            updateRestantsDisplay();
             startStatsRefresh();
-            requestFullscreen();
         };
         
         async function loadAvailableLists(){
@@ -580,23 +580,40 @@
         
         function requestFullscreen(){
             const elem=document.documentElement;
+            const onSuccess=()=>{
+                isFullscreen=true;
+                updateFullscreenButton()
+            };
+            const onError=(err)=>{
+                console.log('Erreur fullscreen:',err);
+                alert('Le plein écran nécessite une interaction utilisateur. Veuillez réessayer.')
+            };
+            
             if(elem.requestFullscreen){
-                elem.requestFullscreen().then(()=>{
-                    isFullscreen=true;
-                    updateFullscreenButton()
-                }).catch(err=>console.log('Erreur fullscreen:',err))
+                elem.requestFullscreen().then(onSuccess).catch(onError)
             }else if(elem.webkitRequestFullscreen){
-                elem.webkitRequestFullscreen();
-                isFullscreen=true;
-                updateFullscreenButton()
+                try{
+                    elem.webkitRequestFullscreen();
+                    onSuccess()
+                }catch(e){
+                    onError(e)
+                }
             }else if(elem.mozRequestFullScreen){
-                elem.mozRequestFullScreen();
-                isFullscreen=true;
-                updateFullscreenButton()
+                try{
+                    elem.mozRequestFullScreen();
+                    onSuccess()
+                }catch(e){
+                    onError(e)
+                }
             }else if(elem.msRequestFullscreen){
-                elem.msRequestFullscreen();
-                isFullscreen=true;
-                updateFullscreenButton()
+                try{
+                    elem.msRequestFullscreen();
+                    onSuccess()
+                }catch(e){
+                    onError(e)
+                }
+            }else{
+                alert('Plein écran non supporté par ce navigateur')
             }
         }
         
@@ -623,8 +640,13 @@
         
         function updateFullscreenButton(){
             const btn=document.getElementById('fullscreenBtn');
-            btn.textContent=isFullscreen?'⛶':'⛶';
-            btn.title=isFullscreen?'Quitter le plein écran':'Plein écran'
+            if(isFullscreen){
+                btn.textContent='◱';
+                btn.title='Quitter le plein écran'
+            }else{
+                btn.textContent='⛶';
+                btn.title='Plein écran'
+            }
         }
         
         document.addEventListener('fullscreenchange',()=>{
@@ -639,7 +661,6 @@
             isFullscreen=!!document.mozFullScreenElement;
             updateFullscreenButton()
         });
-        document.addEventListener('msfullscreenchange',()=>{
-            isFullscreen=!!document.msFullscreenElement;
-            updateFullscreenButton()
-        });
+    </script>
+</body>
+</html>
