@@ -16,9 +16,11 @@
             overflow: hidden;
         }
         .container { max-width: 600px; margin: 0 auto; padding: 8px; height: 100vh; display: flex; flex-direction: column; }
-        .header { background: white; border-radius: 12px 12px 0 0; padding: 8px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .header { background: white; border-radius: 12px 12px 0 0; padding: 8px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); position: relative; }
         .header h1 { color: #1f2937; font-size: 18px; margin-bottom: 2px; }
         .header p { color: #6b7280; font-size: 11px; }
+        .fullscreen-btn { position: absolute; top: 8px; left: 8px; background: #667eea; color: white; border: none; border-radius: 6px; padding: 6px 10px; font-size: 16px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2); z-index: 100; }
+        .fullscreen-btn:active { background: #5568d3; }
         .cache-status { font-size: 9px; color: #6b7280; margin-top: 2px; }
         .cache-status.loading { color: #f59e0b; }
         .cache-status.ready { color: #10b981; }
@@ -73,8 +75,9 @@
 <body>
     <div class="container">
         <div class="header">
+            <button class="fullscreen-btn" id="fullscreenBtn" onclick="toggleFullscreen()">⛶</button>
             <h1>🎫 Contrôle d'Accès</h1>
-            <p>Scanner automatique vazertyu</p>
+            <p>Scanner automatique PleinEcran</p>
             <div class="cache-status" id="cacheStatus">⏳ Chargement...</div>
         </div>
         <div class="config-box" id="configBox">
@@ -134,37 +137,509 @@
     </div>
     <div id="result"></div>
     <script>
-        let scanner=null,apiUrl=localStorage.getItem('apiUrl')||'',stats=JSON.parse(localStorage.getItem('stats')||'{"ok":0,"ko":0,"refuse":0}'),scanning=false,scannerActive=false,localCache=[],usingCache=false,currentMode='atelier',flashEnabled=false,currentListName='',availableLists=[],statsRefreshInterval=null;
-        window.onload=()=>{updateStats();if(apiUrl){document.getElementById('apiUrl').value=apiUrl;document.getElementById('configBox').className='config-box success'}currentMode=localStorage.getItem('scanMode')||'atelier';currentListName=localStorage.getItem('currentList')||'';updateModeDisplay();loadAvailableLists();startStatsRefresh()};
-        async function loadAvailableLists(){const statusEl=document.getElementById('cacheStatus');if(!apiUrl){statusEl.className='cache-status error';statusEl.textContent='❌ API non configurée';return}try{const response=await fetch(`${apiUrl}?action=getActiveLists&t=${Date.now()}`);const data=await response.json();if(data.success&&data.lists){availableLists=data.lists;updateListSelect();const activeLists=availableLists.filter(l=>l.estActive);if(activeLists.length>0){statusEl.className='cache-status ready';statusEl.textContent=`✅ ${activeLists.length} liste(s) active(s)`}else{statusEl.className='cache-status error';statusEl.textContent='⚠️ Aucune liste active'}}else{statusEl.className='cache-status error';statusEl.textContent='❌ Erreur: '+(data.error||'Réponse invalide')}}catch(e){statusEl.className='cache-status error';statusEl.textContent='❌ Erreur connexion'}}
-        function updateListSelect(){const select=document.getElementById('listSelect');select.innerHTML='';const activeLists=availableLists.filter(l=>l.estActive);if(activeLists.length===0){select.innerHTML='<option value="">Aucune liste active</option>';return}activeLists.forEach(list=>{const option=document.createElement('option');option.value=list.nom;option.textContent=list.nom;select.appendChild(option)});if(currentListName&&activeLists.find(l=>l.nom===currentListName)){select.value=currentListName}else{select.value=activeLists[0].nom;currentListName=activeLists[0].nom;localStorage.setItem('currentList',currentListName)}updateListIndicator();updateModeButtonVisibility();updateRestantsDisplay()}
-        function changeList(){const select=document.getElementById('listSelect');currentListName=select.value.trim();if(!currentListName){alert('Sélectionnez une liste');return}localStorage.setItem('currentList',currentListName);updateListIndicator();updateModeButtonVisibility();updateRestantsDisplay();loadCache();loadGlobalStats()}
-        function updateListIndicator(){const indicator=document.getElementById('listIndicator');const selectedList=availableLists.find(l=>l.nom===currentListName);if(selectedList){const activeClass=selectedList.estActive?'active':'';const status=selectedList.estActive?'🟢':'⚫';indicator.textContent=`${status} ${currentListName}`;indicator.className=`list-indicator ${activeClass}`}else{indicator.textContent='📋 -';indicator.className='list-indicator'}}
-        function updateModeDisplay(){const btn=document.getElementById('modeBtn');if(currentMode==='atelier'){btn.textContent='🏭 Atelier';btn.style.background='#f59e0b'}else{btn.textContent='🎤 Conférence';btn.style.background='#10b981'}}
-        function updateModeButtonVisibility(){const btn=document.getElementById('modeBtn');const singleLocationLists=['AG','TERROIR','GALA','MIDI - MER','MIDI - JEU'];btn.style.display=singleLocationLists.includes(currentListName)?'none':'block'}
-        function updateRestantsDisplay(){const singleLocationLists=['AG','TERROIR','GALA','MIDI - MER','MIDI - JEU'];const container=document.getElementById('statsRestants');if(singleLocationLists.includes(currentListName)){container.innerHTML='<div class="stat-row"><span class="stat-label">📋 Total</span><span class="stat-value black" id="statRestantTotal">0</span></div>'}else{container.innerHTML='<div class="stat-row"><span class="stat-label">🎤 Conf</span><span class="stat-value black" id="statRestantConf">0</span></div><div class="stat-row"><span class="stat-label">🏭 Atelier</span><span class="stat-value black" id="statRestantAtel">0</span></div>'}}
-        function getSingleLocationName(listName){const locationMap={'AG':'Assemblée Générale','TERROIR':'Terroir','GALA':'Gala','MIDI - MER':'MIDI - Mercredi','MIDI - JEU':'MIDI - Jeudi'};return locationMap[listName]||null}
-        function toggleMode(){currentMode=currentMode==='atelier'?'conference':'atelier';localStorage.setItem('scanMode',currentMode);updateModeDisplay()}
-        function saveConfig(){const url=document.getElementById('apiUrl').value.trim();if(!url){alert('Entrez une URL');return}if(!url.includes('script.google.com')){alert('URL invalide');return}apiUrl=url;localStorage.setItem('apiUrl',url);document.getElementById('configBox').className='config-box success';loadAvailableLists()}
-        async function loadCache(){const statusEl=document.getElementById('cacheStatus');statusEl.className='cache-status loading';statusEl.textContent='⏳ Chargement cache...';if(!apiUrl||!currentListName){statusEl.className='cache-status error';statusEl.textContent='❌ Configuration incomplète';return}try{const response=await fetch(`${apiUrl}?action=getAll&listeName=${encodeURIComponent(currentListName)}&t=${Date.now()}`);const data=await response.json();if(data.success&&data.participants){localCache=data.participants;localStorage.setItem('localCache',JSON.stringify(localCache));localStorage.setItem('currentListCache',currentListName);usingCache=true;statusEl.className='cache-status ready';statusEl.textContent=`✅ Cache chargé (${localCache.length} personnes) - ${currentListName}`}else{statusEl.className='cache-status error';statusEl.textContent='❌ Impossible de charger le cache'}}catch(e){statusEl.className='cache-status error';statusEl.textContent='❌ Erreur connexion'}}
-        function toggleCamera(){scannerActive?stopScanner():startScanner()}
-        async function startScanner(){if(!apiUrl||!currentListName||!usingCache){alert('Configuration incomplète. Configurez l\'API et chargez le cache.');return}if(scannerActive)return;try{scanner=new Html5Qrcode("reader");await scanner.start({facingMode:"environment"},{fps:10,qrbox:{width:200,height:200}},onScanSuccess,()=>{});scannerActive=true;const btn=document.getElementById('cameraBtnToggle');btn.textContent='⏹️ Arrêter';btn.className='btn btn-stop';document.getElementById('scannerStatus').className='active';document.getElementById('scannerStatus').textContent='🟢 Actif'}catch(err){alert('Erreur caméra')}}
-        function stopScanner(){if(scanner&&scannerActive){scanner.stop().then(()=>{scannerActive=false;const btn=document.getElementById('cameraBtnToggle');btn.textContent='📷 Actif';btn.className='btn btn-start';document.getElementById('scannerStatus').className='inactive';document.getElementById('scannerStatus').textContent='⚫ Arrêté';flashEnabled=false;document.getElementById('flashBtn').textContent='🔦 Flash OFF';document.getElementById('flashBtn').style.background='#667eea'})}}
-        function toggleFlash(){if(!scannerActive){alert('Démarrez le scanner d\'abord');return}flashEnabled=!flashEnabled;const btn=document.getElementById('flashBtn');if(scanner){scanner.applyVideoConstraints({advanced:[{torch:flashEnabled}]}).then(()=>{btn.textContent=flashEnabled?'🔦 Flash ON':'🔦 Flash OFF';btn.style.background=flashEnabled?'#fbbf24':'#667eea'}).catch(()=>{alert('Flash non supporté');flashEnabled=false;btn.textContent='🔦 Flash OFF';btn.style.background='#667eea'})}}
-        function onScanSuccess(code){if(scanning)return;scanning=true;scanner.pause(true);verifyCodeLocal(code)}
-        function checkManual(){const code=document.getElementById('manualCode').value.trim();if(!code){alert('Entrez un code');return}if(scannerActive)scanner.pause(true);scanning=true;verifyCodeLocal(code);document.getElementById('manualCode').value=''}
-        function verifyCodeLocal(code){const now=new Date();const heure=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0');const date=String(now.getDate()).padStart(2,'0')+'/'+String(now.getMonth()+1).padStart(2,'0')+'/'+now.getFullYear();const participant=localCache.find(p=>p.code.toLowerCase()===code.toLowerCase());if(participant){const singleLocation=getSingleLocationName(currentListName);if(singleLocation){stats.ok++;beepAtelierA();showResultCustom('success',participant.nom,'AUTORISÉ',singleLocation,heure,date);syncToServer(code,participant.nom,heure,date,singleLocation,currentListName,'AUTORISE')}else{const participantType=String(participant.atelier).trim().toUpperCase();let typeAttendu=currentMode==='atelier'?['ATELIER A','ATELIER B']:['CONFERENCE'];const estAutorise=typeAttendu.some(t=>participantType===t.toUpperCase());const estMauvaisMode=(currentMode==='atelier'&&participantType==='CONFERENCE')||(currentMode==='conference'&&(participantType==='ATELIER A'||participantType==='ATELIER B'));if(estAutorise){stats.ok++;beepAtelierA();showResultCustom('success',participant.nom,'AUTORISÉ',participant.atelier,heure,date);syncToServer(code,participant.nom,heure,date,currentMode,currentListName,'AUTORISE')}else if(estMauvaisMode){stats.ko++;beepMauvaisMode();showResultCustom('warning',participant.nom,'MAUVAIS MODE',participant.atelier,heure,date);syncToServer(code,participant.nom,heure,date,currentMode,currentListName,'MAUVAIS MODE')}else{stats.refuse++;beepNonAutorise();showResultCustom('error',code,'NON AUTORISÉ','','','')}}}else{stats.refuse++;beepNonAutorise();showResultCustom('error',code,'NON AUTORISÉ','','','')}localStorage.setItem('stats',JSON.stringify(stats));updateStats();setTimeout(resumeScanner,3000)}
-        function resumeScanner(){scanning=false;if(scanner&&scannerActive)scanner.resume()}
-        async function syncToServer(code,nom,heure,date,mode,listeName,statut){try{await fetch(`${apiUrl}?code=${encodeURIComponent(code)}&heure=${encodeURIComponent(heure)}&date=${encodeURIComponent(date)}&lieu=${encodeURIComponent(mode)}&listeName=${encodeURIComponent(listeName)}&statut=${encodeURIComponent(statut)}&sync=1&t=${Date.now()}`);setTimeout(()=>loadGlobalStats(),500)}catch(e){console.log('Sync échouée')}}
-        function showResultCustom(type,nom,statut,atelier,heure,date){let icon=type==='success'?'✅':type==='warning'?'⚠️':'❌';const time=(heure&&date)?`<div class="result-time">${date} à ${heure}</div>`:'';document.getElementById('result').innerHTML=`<div class="result ${type}"><div class="result-icon">${icon}</div><div class="result-name">${esc(nom)}</div><div class="result-message">${esc(statut)}</div><div class="result-atelier">${esc(atelier)}</div>${time}</div>`;setTimeout(()=>{document.getElementById('result').innerHTML=''},3000)}
-        function updateStats(){document.getElementById('statPersonnelOK').textContent=stats.ok;document.getElementById('statPersonnelKO').textContent=stats.ko;document.getElementById('statPersonnelRefuse').textContent=stats.refuse;loadGlobalStats()}
-        async function loadGlobalStats(){if(!apiUrl||!currentListName)return;try{const response=await fetch(`${apiUrl}?action=getStats&listeName=${encodeURIComponent(currentListName)}&t=${Date.now()}`);const data=await response.json();if(data.success){document.getElementById('statGlobalOK').textContent=data.totalOK||0;document.getElementById('statGlobalKO').textContent=data.totalKO||0;const totalRefuse=localCache.length-(data.totalOK+data.totalKO);document.getElementById('statGlobalRefuse').textContent=totalRefuse>0?totalRefuse:0;const singleLocationLists=['AG','TERROIR','GALA','MIDI - MER','MIDI - JEU'];if(singleLocationLists.includes(currentListName)){const restantTotal=localCache.length-(data.totalOK||0);const el=document.getElementById('statRestantTotal');if(el)el.textContent=restantTotal>0?restantTotal:0}else{document.getElementById('statRestantConf').textContent=data.enAttenteConf||0;document.getElementById('statRestantAtel').textContent=data.enAttenteAtel||0}}}catch(e){console.log('Erreur chargement stats globales:',e)}}
-        function startStatsRefresh(){if(statsRefreshInterval)clearInterval(statsRefreshInterval);statsRefreshInterval=setInterval(()=>{loadGlobalStats()},10000)}
-        function stopStatsRefresh(){if(statsRefreshInterval){clearInterval(statsRefreshInterval);statsRefreshInterval=null}}
-        function esc(txt){const div=document.createElement('div');div.textContent=txt;return div.innerHTML}
-        function beepAtelierA(){try{const ctx=new(window.AudioContext||window.webkitAudioContext)();const osc=ctx.createOscillator();const gain=ctx.createGain();osc.connect(gain);gain.connect(ctx.destination);osc.frequency.value=1000;gain.gain.setValueAtTime(0.3,ctx.currentTime);gain.gain.exponentialRampToValueAtTime(0.01,ctx.currentTime+0.15);osc.start();osc.stop(ctx.currentTime+0.15)}catch(e){}}
-        function beepMauvaisMode(){try{const ctx=new(window.AudioContext||window.webkitAudioContext)();for(let i=0;i<3;i++){const osc=ctx.createOscillator();const gain=ctx.createGain();osc.connect(gain);gain.connect(ctx.destination);osc.frequency.value=250;const startTime=ctx.currentTime+(i*0.15);gain.gain.setValueAtTime(0.3,startTime);gain.gain.exponentialRampToValueAtTime(0.01,startTime+0.12);osc.start(startTime);osc.stop(startTime+0.12)}}catch(e){}}
-        function beepNonAutorise(){try{const ctx=new(window.AudioContext||window.webkitAudioContext)();for(let i=0;i<5;i++){const osc=ctx.createOscillator();const gain=ctx.createGain();osc.connect(gain);gain.connect(ctx.destination);osc.frequency.value=250;const startTime=ctx.currentTime+(i*0.15);gain.gain.setValueAtTime(0.3,startTime);gain.gain.exponentialRampToValueAtTime(0.01,startTime+0.12);osc.start(startTime);osc.stop(startTime+0.12)}}catch(e){}}
-    </script>
-</body>
-</html>
+        let scanner=null,apiUrl=localStorage.getItem('apiUrl')||'',stats=JSON.parse(localStorage.getItem('stats')||'{"ok":0,"ko":0,"refuse":0}'),scanning=false,scannerActive=false,localCache=[],usingCache=false,currentMode='atelier',flashEnabled=false,currentListName='',availableLists=[],statsRefreshInterval=null,isFullscreen=false;
+        
+        window.onload=()=>{
+            updateStats();
+            if(apiUrl){
+                document.getElementById('apiUrl').value=apiUrl;
+                document.getElementById('configBox').className='config-box success'
+            }
+            currentMode=localStorage.getItem('scanMode')||'atelier';
+            currentListName=localStorage.getItem('currentList')||'';
+            updateModeDisplay();
+            loadAvailableLists();
+            startStatsRefresh();
+            requestFullscreen();
+        };
+        
+        async function loadAvailableLists(){
+            const statusEl=document.getElementById('cacheStatus');
+            if(!apiUrl){
+                statusEl.className='cache-status error';
+                statusEl.textContent='❌ API non configurée';
+                return
+            }
+            try{
+                const response=await fetch(`${apiUrl}?action=getActiveLists&t=${Date.now()}`);
+                const data=await response.json();
+                if(data.success&&data.lists){
+                    availableLists=data.lists;
+                    updateListSelect();
+                    const activeLists=availableLists.filter(l=>l.estActive);
+                    if(activeLists.length>0){
+                        statusEl.className='cache-status ready';
+                        statusEl.textContent=`✅ ${activeLists.length} liste(s) active(s)`
+                    }else{
+                        statusEl.className='cache-status error';
+                        statusEl.textContent='⚠️ Aucune liste active'
+                    }
+                }else{
+                    statusEl.className='cache-status error';
+                    statusEl.textContent='❌ Erreur: '+(data.error||'Réponse invalide')
+                }
+            }catch(e){
+                statusEl.className='cache-status error';
+                statusEl.textContent='❌ Erreur connexion'
+            }
+        }
+        
+        function updateListSelect(){
+            const select=document.getElementById('listSelect');
+            select.innerHTML='';
+            const activeLists=availableLists.filter(l=>l.estActive);
+            if(activeLists.length===0){
+                select.innerHTML='<option value="">Aucune liste active</option>';
+                return
+            }
+            activeLists.forEach(list=>{
+                const option=document.createElement('option');
+                option.value=list.nom;
+                option.textContent=list.nom;
+                select.appendChild(option)
+            });
+            if(currentListName&&activeLists.find(l=>l.nom===currentListName)){
+                select.value=currentListName
+            }else{
+                select.value=activeLists[0].nom;
+                currentListName=activeLists[0].nom;
+                localStorage.setItem('currentList',currentListName)
+            }
+            updateListIndicator();
+            updateModeButtonVisibility();
+            updateRestantsDisplay()
+        }
+        
+        function changeList(){
+            const select=document.getElementById('listSelect');
+            currentListName=select.value.trim();
+            if(!currentListName){
+                alert('Sélectionnez une liste');
+                return
+            }
+            localStorage.setItem('currentList',currentListName);
+            updateListIndicator();
+            updateModeButtonVisibility();
+            updateRestantsDisplay();
+            loadCache();
+            loadGlobalStats()
+        }
+        
+        function updateListIndicator(){
+            const indicator=document.getElementById('listIndicator');
+            const selectedList=availableLists.find(l=>l.nom===currentListName);
+            if(selectedList){
+                const activeClass=selectedList.estActive?'active':'';
+                const status=selectedList.estActive?'🟢':'⚫';
+                indicator.textContent=`${status} ${currentListName}`;
+                indicator.className=`list-indicator ${activeClass}`
+            }else{
+                indicator.textContent='📋 -';
+                indicator.className='list-indicator'
+            }
+        }
+        
+        function updateModeDisplay(){
+            const btn=document.getElementById('modeBtn');
+            if(currentMode==='atelier'){
+                btn.textContent='🏭 Atelier';
+                btn.style.background='#f59e0b'
+            }else{
+                btn.textContent='🎤 Conférence';
+                btn.style.background='#10b981'
+            }
+        }
+        
+        function updateModeButtonVisibility(){
+            const btn=document.getElementById('modeBtn');
+            const singleLocationLists=['AG','TERROIR','GALA','MIDI - MER','MIDI - JEU'];
+            btn.style.display=singleLocationLists.includes(currentListName)?'none':'block'
+        }
+        
+        function updateRestantsDisplay(){
+            const singleLocationLists=['AG','TERROIR','GALA','MIDI - MER','MIDI - JEU'];
+            const container=document.getElementById('statsRestants');
+            if(singleLocationLists.includes(currentListName)){
+                container.innerHTML='<div class="stat-row"><span class="stat-label">📋 Total</span><span class="stat-value black" id="statRestantTotal">0</span></div>'
+            }else{
+                container.innerHTML='<div class="stat-row"><span class="stat-label">🎤 Conf</span><span class="stat-value black" id="statRestantConf">0</span></div><div class="stat-row"><span class="stat-label">🏭 Atelier</span><span class="stat-value black" id="statRestantAtel">0</span></div>'
+            }
+        }
+        
+        function getSingleLocationName(listName){
+            const locationMap={'AG':'Assemblée Générale','TERROIR':'Terroir','GALA':'Gala','MIDI - MER':'MIDI - Mercredi','MIDI - JEU':'MIDI - Jeudi'};
+            return locationMap[listName]||null
+        }
+        
+        function toggleMode(){
+            currentMode=currentMode==='atelier'?'conference':'atelier';
+            localStorage.setItem('scanMode',currentMode);
+            updateModeDisplay()
+        }
+        
+        function saveConfig(){
+            const url=document.getElementById('apiUrl').value.trim();
+            if(!url){
+                alert('Entrez une URL');
+                return
+            }
+            if(!url.includes('script.google.com')){
+                alert('URL invalide');
+                return
+            }
+            apiUrl=url;
+            localStorage.setItem('apiUrl',url);
+            document.getElementById('configBox').className='config-box success';
+            loadAvailableLists()
+        }
+        
+        async function loadCache(){
+            const statusEl=document.getElementById('cacheStatus');
+            statusEl.className='cache-status loading';
+            statusEl.textContent='⏳ Chargement cache...';
+            if(!apiUrl||!currentListName){
+                statusEl.className='cache-status error';
+                statusEl.textContent='❌ Configuration incomplète';
+                return
+            }
+            try{
+                const response=await fetch(`${apiUrl}?action=getAll&listeName=${encodeURIComponent(currentListName)}&t=${Date.now()}`);
+                const data=await response.json();
+                if(data.success&&data.participants){
+                    localCache=data.participants;
+                    localStorage.setItem('localCache',JSON.stringify(localCache));
+                    localStorage.setItem('currentListCache',currentListName);
+                    usingCache=true;
+                    statusEl.className='cache-status ready';
+                    statusEl.textContent=`✅ Cache chargé (${localCache.length} personnes) - ${currentListName}`
+                }else{
+                    statusEl.className='cache-status error';
+                    statusEl.textContent='❌ Impossible de charger le cache'
+                }
+            }catch(e){
+                statusEl.className='cache-status error';
+                statusEl.textContent='❌ Erreur connexion'
+            }
+        }
+        
+        function toggleCamera(){
+            scannerActive?stopScanner():startScanner()
+        }
+        
+        async function startScanner(){
+            if(!apiUrl||!currentListName||!usingCache){
+                alert('Configuration incomplète. Configurez l\'API et chargez le cache.');
+                return
+            }
+            if(scannerActive)return;
+            try{
+                scanner=new Html5Qrcode("reader");
+                await scanner.start({facingMode:"environment"},{fps:10,qrbox:{width:200,height:200}},onScanSuccess,()=>{});
+                scannerActive=true;
+                const btn=document.getElementById('cameraBtnToggle');
+                btn.textContent='⏹️ Arrêter';
+                btn.className='btn btn-stop';
+                document.getElementById('scannerStatus').className='active';
+                document.getElementById('scannerStatus').textContent='🟢 Actif'
+            }catch(err){
+                alert('Erreur caméra')
+            }
+        }
+        
+        function stopScanner(){
+            if(scanner&&scannerActive){
+                scanner.stop().then(()=>{
+                    scannerActive=false;
+                    const btn=document.getElementById('cameraBtnToggle');
+                    btn.textContent='📷 Actif';
+                    btn.className='btn btn-start';
+                    document.getElementById('scannerStatus').className='inactive';
+                    document.getElementById('scannerStatus').textContent='⚫ Arrêté';
+                    flashEnabled=false;
+                    document.getElementById('flashBtn').textContent='🔦 Flash OFF';
+                    document.getElementById('flashBtn').style.background='#667eea'
+                })
+            }
+        }
+        
+        function toggleFlash(){
+            if(!scannerActive){
+                alert('Démarrez le scanner d\'abord');
+                return
+            }
+            flashEnabled=!flashEnabled;
+            const btn=document.getElementById('flashBtn');
+            if(scanner){
+                scanner.applyVideoConstraints({advanced:[{torch:flashEnabled}]}).then(()=>{
+                    btn.textContent=flashEnabled?'🔦 Flash ON':'🔦 Flash OFF';
+                    btn.style.background=flashEnabled?'#fbbf24':'#667eea'
+                }).catch(()=>{
+                    alert('Flash non supporté');
+                    flashEnabled=false;
+                    btn.textContent='🔦 Flash OFF';
+                    btn.style.background='#667eea'
+                })
+            }
+        }
+        
+        function onScanSuccess(code){
+            if(scanning)return;
+            scanning=true;
+            scanner.pause(true);
+            verifyCodeLocal(code)
+        }
+        
+        function checkManual(){
+            const code=document.getElementById('manualCode').value.trim();
+            if(!code){
+                alert('Entrez un code');
+                return
+            }
+            if(scannerActive)scanner.pause(true);
+            scanning=true;
+            verifyCodeLocal(code);
+            document.getElementById('manualCode').value=''
+        }
+        
+        function verifyCodeLocal(code){
+            const now=new Date();
+            const heure=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0');
+            const date=String(now.getDate()).padStart(2,'0')+'/'+String(now.getMonth()+1).padStart(2,'0')+'/'+now.getFullYear();
+            const participant=localCache.find(p=>p.code.toLowerCase()===code.toLowerCase());
+            if(participant){
+                const singleLocation=getSingleLocationName(currentListName);
+                if(singleLocation){
+                    stats.ok++;
+                    beepAtelierA();
+                    showResultCustom('success',participant.nom,'AUTORISÉ',singleLocation,heure,date);
+                    syncToServer(code,participant.nom,heure,date,singleLocation,currentListName,'AUTORISE')
+                }else{
+                    const participantType=String(participant.atelier).trim().toUpperCase();
+                    let typeAttendu=currentMode==='atelier'?['ATELIER A','ATELIER B']:['CONFERENCE'];
+                    const estAutorise=typeAttendu.some(t=>participantType===t.toUpperCase());
+                    const estMauvaisMode=(currentMode==='atelier'&&participantType==='CONFERENCE')||(currentMode==='conference'&&(participantType==='ATELIER A'||participantType==='ATELIER B'));
+                    if(estAutorise){
+                        stats.ok++;
+                        beepAtelierA();
+                        showResultCustom('success',participant.nom,'AUTORISÉ',participant.atelier,heure,date);
+                        syncToServer(code,participant.nom,heure,date,currentMode,currentListName,'AUTORISE')
+                    }else if(estMauvaisMode){
+                        stats.ko++;
+                        beepMauvaisMode();
+                        showResultCustom('warning',participant.nom,'MAUVAIS MODE',participant.atelier,heure,date);
+                        syncToServer(code,participant.nom,heure,date,currentMode,currentListName,'MAUVAIS MODE')
+                    }else{
+                        stats.refuse++;
+                        beepNonAutorise();
+                        showResultCustom('error',code,'NON AUTORISÉ','','','')
+                    }
+                }
+            }else{
+                stats.refuse++;
+                beepNonAutorise();
+                showResultCustom('error',code,'NON AUTORISÉ','','','')
+            }
+            localStorage.setItem('stats',JSON.stringify(stats));
+            updateStats();
+            setTimeout(resumeScanner,3000)
+        }
+        
+        function resumeScanner(){
+            scanning=false;
+            if(scanner&&scannerActive)scanner.resume()
+        }
+        
+        async function syncToServer(code,nom,heure,date,mode,listeName,statut){
+            try{
+                await fetch(`${apiUrl}?code=${encodeURIComponent(code)}&heure=${encodeURIComponent(heure)}&date=${encodeURIComponent(date)}&lieu=${encodeURIComponent(mode)}&listeName=${encodeURIComponent(listeName)}&statut=${encodeURIComponent(statut)}&sync=1&t=${Date.now()}`);
+                setTimeout(()=>loadGlobalStats(),500)
+            }catch(e){
+                console.log('Sync échouée')
+            }
+        }
+        
+        function showResultCustom(type,nom,statut,atelier,heure,date){
+            let icon=type==='success'?'✅':type==='warning'?'⚠️':'❌';
+            const time=(heure&&date)?`<div class="result-time">${date} à ${heure}</div>`:'';
+            document.getElementById('result').innerHTML=`<div class="result ${type}"><div class="result-icon">${icon}</div><div class="result-name">${esc(nom)}</div><div class="result-message">${esc(statut)}</div><div class="result-atelier">${esc(atelier)}</div>${time}</div>`;
+            setTimeout(()=>{
+                document.getElementById('result').innerHTML=''
+            },3000)
+        }
+        
+        function updateStats(){
+            document.getElementById('statPersonnelOK').textContent=stats.ok;
+            document.getElementById('statPersonnelKO').textContent=stats.ko;
+            document.getElementById('statPersonnelRefuse').textContent=stats.refuse;
+            loadGlobalStats()
+        }
+        
+        async function loadGlobalStats(){
+            if(!apiUrl||!currentListName)return;
+            try{
+                const response=await fetch(`${apiUrl}?action=getStats&listeName=${encodeURIComponent(currentListName)}&t=${Date.now()}`);
+                const data=await response.json();
+                if(data.success){
+                    document.getElementById('statGlobalOK').textContent=data.totalOK||0;
+                    document.getElementById('statGlobalKO').textContent=data.totalKO||0;
+                    const totalRefuse=localCache.length-(data.totalOK+data.totalKO);
+                    document.getElementById('statGlobalRefuse').textContent=totalRefuse>0?totalRefuse:0;
+                    const singleLocationLists=['AG','TERROIR','GALA','MIDI - MER','MIDI - JEU'];
+                    if(singleLocationLists.includes(currentListName)){
+                        const restantTotal=localCache.length-(data.totalOK||0);
+                        const el=document.getElementById('statRestantTotal');
+                        if(el)el.textContent=restantTotal>0?restantTotal:0
+                    }else{
+                        document.getElementById('statRestantConf').textContent=data.enAttenteConf||0;
+                        document.getElementById('statRestantAtel').textContent=data.enAttenteAtel||0
+                    }
+                }
+            }catch(e){
+                console.log('Erreur chargement stats globales:',e)
+            }
+        }
+        
+        function startStatsRefresh(){
+            if(statsRefreshInterval)clearInterval(statsRefreshInterval);
+            statsRefreshInterval=setInterval(()=>{
+                loadGlobalStats()
+            },10000)
+        }
+        
+        function stopStatsRefresh(){
+            if(statsRefreshInterval){
+                clearInterval(statsRefreshInterval);
+                statsRefreshInterval=null
+            }
+        }
+        
+        function esc(txt){
+            const div=document.createElement('div');
+            div.textContent=txt;
+            return div.innerHTML
+        }
+        
+        function beepAtelierA(){
+            try{
+                const ctx=new(window.AudioContext||window.webkitAudioContext)();
+                const osc=ctx.createOscillator();
+                const gain=ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.frequency.value=1000;
+                gain.gain.setValueAtTime(0.3,ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01,ctx.currentTime+0.15);
+                osc.start();
+                osc.stop(ctx.currentTime+0.15)
+            }catch(e){}
+        }
+        
+        function beepMauvaisMode(){
+            try{
+                const ctx=new(window.AudioContext||window.webkitAudioContext)();
+                for(let i=0;i<3;i++){
+                    const osc=ctx.createOscillator();
+                    const gain=ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.frequency.value=250;
+                    const startTime=ctx.currentTime+(i*0.15);
+                    gain.gain.setValueAtTime(0.3,startTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01,startTime+0.12);
+                    osc.start(startTime);
+                    osc.stop(startTime+0.12)
+                }
+            }catch(e){}
+        }
+        
+        function beepNonAutorise(){
+            try{
+                const ctx=new(window.AudioContext||window.webkitAudioContext)();
+                for(let i=0;i<5;i++){
+                    const osc=ctx.createOscillator();
+                    const gain=ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.frequency.value=250;
+                    const startTime=ctx.currentTime+(i*0.15);
+                    gain.gain.setValueAtTime(0.3,startTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01,startTime+0.12);
+                    osc.start(startTime);
+                    osc.stop(startTime+0.12)
+                }
+            }catch(e){}
+        }
+        
+        function toggleFullscreen(){
+            if(!isFullscreen){
+                requestFullscreen()
+            }else{
+                exitFullscreen()
+            }
+        }
+        
+        function requestFullscreen(){
+            const elem=document.documentElement;
+            if(elem.requestFullscreen){
+                elem.requestFullscreen().then(()=>{
+                    isFullscreen=true;
+                    updateFullscreenButton()
+                }).catch(err=>console.log('Erreur fullscreen:',err))
+            }else if(elem.webkitRequestFullscreen){
+                elem.webkitRequestFullscreen();
+                isFullscreen=true;
+                updateFullscreenButton()
+            }else if(elem.mozRequestFullScreen){
+                elem.mozRequestFullScreen();
+                isFullscreen=true;
+                updateFullscreenButton()
+            }else if(elem.msRequestFullscreen){
+                elem.msRequestFullscreen();
+                isFullscreen=true;
+                updateFullscreenButton()
+            }
+        }
+        
+        function exitFullscreen(){
+            if(document.exitFullscreen){
+                document.exitFullscreen().then(()=>{
+                    isFullscreen=false;
+                    updateFullscreenButton()
+                }).catch(err=>console.log('Erreur sortie fullscreen:',err))
+            }else if(document.webkitExitFullscreen){
+                document.webkitExitFullscreen();
+                isFullscreen=false;
+                updateFullscreenButton()
+            }else if(document.mozCancelFullScreen){
+                document.mozCancelFullScreen();
+                isFullscreen=false;
+                updateFullscreenButton()
+            }else if(document.msExitFullscreen){
+                document.msExitFullscreen();
+                isFullscreen=false;
+                updateFullscreenButton()
+            }
+        }
+        
+        function updateFullscreenButton(){
+            const btn=document.getElementById('fullscreenBtn');
+            btn.textContent=isFullscreen?'⛶':'⛶';
+            btn.title=isFullscreen?'Quitter le plein écran':'Plein écran'
+        }
+        
+        document.addEventListener('fullscreenchange',()=>{
+            isFullscreen=!!document.fullscreenElement;
+            updateFullscreenButton()
+        });
+        document.addEventListener('webkitfullscreenchange',()=>{
+            isFullscreen=!!document.webkitFullscreenElement;
+            updateFullscreenButton()
+        });
+        document.addEventListener('mozfullscreenchange',()=>{
+            isFullscreen=!!document.mozFullScreenElement;
+            updateFullscreenButton()
+        });
+        document.addEventListener('msfullscreenchange',()=>{
+            isFullscreen=!!document.msFullscreenElement;
+            updateFullscreenButton()
+        });
