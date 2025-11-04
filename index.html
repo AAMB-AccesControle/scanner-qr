@@ -252,12 +252,12 @@
         
         function updateModeButtonVisibility(){
             const btn=document.getElementById('modeBtn');
-            const singleLocationLists=['AG','TERROIR','GALA','MIDI - MER','MIDI - JEU'];
+            const singleLocationLists=['AG','TERROIR','GALA','MIDI - MER','MIDI - JEU', 'ACCUEIL MAR', 'ACCUEIL MER','ACCUEIL JEU'];
             btn.style.display=singleLocationLists.includes(currentListName)?'none':'block'
         }
         
         function updateRestantsDisplay(){
-            const singleLocationLists=['AG','TERROIR','GALA','MIDI - MER','MIDI - JEU'];
+            const singleLocationLists=['AG','TERROIR','GALA','MIDI - MER','MIDI - JEU','ACCUEIL MAR', 'ACCUEIL MER','ACCUEIL JEU'];
             const container=document.getElementById('statsRestants');
             if(singleLocationLists.includes(currentListName)){
                 container.innerHTML='<div class="stat-row"><span class="stat-label">📋 Total</span><span class="stat-value black" id="statRestantTotal">0</span></div>'
@@ -267,7 +267,7 @@
         }
         
         function getSingleLocationName(listName){
-            const locationMap={'AG':'Assemblée Générale','TERROIR':'Terroir','GALA':'Gala','MIDI - MER':'MIDI - Mercredi','MIDI - JEU':'MIDI - Jeudi'};
+            const locationMap={'AG':'Assemblée Générale','TERROIR':'Terroir','GALA':'Gala','MIDI - MER':'MIDI - Mercredi','MIDI - JEU':'MIDI - Jeudi','ACCUEIL MAR' : 'Bienvenue', 'ACCUEIL MER' : 'Bienvenue','ACCUEIL JEU' : 'Bienvenue'};
             return locationMap[listName]||null
         }
         
@@ -484,7 +484,7 @@
                     document.getElementById('statGlobalKO').textContent=data.totalKO||0;
                     const totalRefuse=localCache.length-(data.totalOK+data.totalKO);
                     document.getElementById('statGlobalRefuse').textContent=totalRefuse>0?totalRefuse:0;
-                    const singleLocationLists=['AG','TERROIR','GALA','MIDI - MER','MIDI - JEU'];
+                    const singleLocationLists=['AG','TERROIR','GALA','MIDI - MER','MIDI - JEU', 'ACCUEIL MAR','ACCUEIL MER','ACCUEIL JEU',];
                     if(singleLocationLists.includes(currentListName)){
                         const restantTotal=localCache.length-(data.totalOK||0);
                         const el=document.getElementById('statRestantTotal');
